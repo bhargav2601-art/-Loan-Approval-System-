@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="space-y-8">
+    <div class="flex justify-between items-center">
+        <h2 class="text-3xl font-black text-primary">Application History</h2>
+        <a href="/dashboard" class="text-gray-500 hover:text-accent font-bold transition-colors">
+            <i class="fas fa-arrow-left mr-2"></i> Back
+        </a>
+    </div>
+
+    <div class="glass-card rounded-3xl overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-gray-50/50 border-b border-gray-100">
+                    <tr>
+                        <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Income</th>
+                        <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Loan Amount</th>
+                        <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Credit Score</th>
+                        <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Interest</th>
+                        <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">EMI</th>
+                        <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest text-center">Result</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    {% for row in data %}
+                    <tr class="hover:bg-gray-50/50 transition-colors group">
+                        <td class="px-6 py-5 font-bold text-primary">${{ row[0] }}</td>
+                        <td class="px-6 py-5 font-bold text-primary">${{ row[1] }}</td>
+                        <td class="px-6 py-5">
+                            <span class="px-3 py-1 bg-gray-100 rounded-lg text-sm font-bold text-gray-600">
+                                {{ row[2] }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-5 text-accent font-bold">{{ row[3] }}%</td>
+                        <td class="px-6 py-5 font-black text-primary">${{ row[4] }}</td>
+                        <td class="px-6 py-5 text-center">
+                            <span class="px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider
+                                {% if row[5] == 'Approved' %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
+                                {{ row[5] }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% if not data %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-12 text-center text-gray-400 italic">
+                            No applications found. <a href="/apply" class="text-accent font-bold not-italic hover:underline ml-1">Apply now</a>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

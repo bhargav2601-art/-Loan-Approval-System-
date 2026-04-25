@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto py-10 space-y-8">
+    
+    <!-- MAIN RESULT CARD -->
+    <div class="glass-card rounded-3xl overflow-hidden shadow-2xl">
+        <div class="p-8 md:p-12 flex flex-col md:flex-row items-center gap-12">
+            <!-- STATUS CIRCLE -->
+            <div class="relative w-48 h-48 flex-shrink-0">
+                <svg class="w-full h-full" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="45" fill="none" stroke="#f1f5f9" stroke-width="8"></circle>
+                    <circle cx="50" cy="50" r="45" fill="none" 
+                        stroke="{% if result == 'Approved' %}#22c55e{% else %}#ef4444{% endif %}" 
+                        stroke-width="8" stroke-dasharray="282.7" 
+                        stroke-dashoffset="{{ 282.7 * (1 - risk_score/100) }}"
+                        stroke-linecap="round" class="transition-all duration-1000 ease-out"></circle>
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                    <span class="text-4xl font-black text-primary">{{ risk_score }}%</span>
+                    <span class="text-xs font-bold text-gray-500 uppercase tracking-widest">Risk Score</span>
+                </div>
+            </div>
+
+            <!-- STATUS TEXT -->
+            <div class="flex-1 text-center md:text-left space-y-4">
+                <div class="inline-flex items-center px-4 py-1.5 rounded-full text-sm font-bold uppercase tracking-wider
+                    {% if result == 'Approved' %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
+                    <i class="fas {% if result == 'Approved' %}fa-check-circle{% else %}fa-times-circle{% endif %} mr-2"></i>
+                    {{ result }}
+                </div>
+                
+                <h2 class="text-4xl font-black text-primary leading-tight">
+                    {% if result == 'Approved' %}
+                        Congratulations! Your loan is pre-approved.
+                    {% else %}
+                        Application requires further review.
+                    {% endif %}
+                </h2>
+                
+                <div class="grid grid-cols-2 gap-4 pt-4">
+                    <div class="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                        <span class="block text-xs font-bold text-gray-400 uppercase">Risk Category</span>
+                        <span class="text-lg font-bold text-primary">{{ risk_cat }}</span>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                        <span class="block text-xs font-bold text-gray-400 uppercase">Interest Rate</span>
+                        <span class="text-lg font-bold text-accent">{{ interest }}% APR</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        {% if result == 'Approved' %}
+        <div class="bg-accent p-6 flex justify-between items-center text-white">
+            <div class="flex items-center space-x-4">
+                <i class="fas fa-calendar-check text-2xl opacity-80"></i>
+                <div>
+                    <span class="block text-xs font-bold uppercase opacity-80">Estimated Monthly EMI</span>
+                    <span class="text-2xl font-black">${{ emi }} / month</span>
+                </div>
+            </div>
+            <button class="bg-white text-accent px-8 py-3 rounded-xl font-bold hover:bg-gray-50 transition-colors">
+                Proceed to E-Sign
+            </button>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- EXPLAINABLE AI & SUGGESTIONS -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <!-- WHY? -->
+        <div class="glass-card rounded-3xl p-8">
+            <h3 class="text-xl font-bold text-primary mb-6 flex items-center">
+                <i class="fas fa-brain text-accent mr-3"></i>
+                AI Decision Insights
+            </h3>
+            <div class="space-y-4">
+                {% for reason in reasons %}
+                <div class="flex items-start space-x-3 p-4 rounded-2xl bg-white border border-gray-100">
+                    <div class="mt-1 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0
+                        {% if result == 'Approved' %}bg-green-100 text-green-600{% else %}bg-red-100 text-red-600{% endif %}">
+                        <i class="fas {% if result == 'Approved' %}fa-check{% else %}fa-exclamation{% endif %} text-[10px]"></i>
+                    </div>
+                    <span class="text-gray-700 font-medium">{{ reason }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- SUGGESTIONS -->
+        <div class="glass-card rounded-3xl p-8">
+            <h3 class="text-xl font-bold text-primary mb-6 flex items-center">
+                <i class="fas fa-lightbulb text-yellow-500 mr-3"></i>
+                Improvement Suggestions
+            </h3>
+            <div class="space-y-4">
+                {% if suggestions %}
+                    {% for sug in suggestions %}
+                    <div class="flex items-start space-x-3 p-4 rounded-2xl bg-blue-50 border border-blue-100">
+                        <div class="mt-1 text-accent flex-shrink-0">
+                            <i class="fas fa-arrow-right"></i>
+                        </div>
+                        <span class="text-blue-800 font-medium">{{ sug }}</span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="flex items-center justify-center h-full text-gray-400 italic">
+                        No immediate improvements needed.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- FRAUD ALERT -->
+    {% if is_fraud %}
+    <div class="bg-red-50 border-2 border-red-200 p-6 rounded-3xl flex items-center space-x-4">
+        <div class="bg-red-500 text-white w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 animate-pulse">
+            <i class="fas fa-shield-virus text-2xl"></i>
+        </div>
+        <div>
+            <h4 class="text-red-800 font-bold text-lg">Potential Fraud Detected</h4>
+            <p class="text-red-600">Our system flagged some inconsistencies. Please verify your data or contact support.</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="text-center">
+        <a href="/dashboard" class="text-gray-500 font-bold hover:text-primary transition-colors">
+            <i class="fas fa-arrow-left mr-2"></i> Back to Dashboard
+        </a>
+    </div>
+</div>
+{% endblock %}

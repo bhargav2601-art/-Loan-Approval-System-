@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- WELCOME HEADER -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <h1 class="text-3xl font-black text-primary">Hello, {{ name }}!</h1>
+            <p class="text-gray-500">Welcome to your smart financial dashboard.</p>
+        </div>
+        <a href="/apply" class="gradient-button text-white px-8 py-4 rounded-2xl font-bold shadow-lg flex items-center space-x-2">
+            <i class="fas fa-plus-circle"></i>
+            <span>New Application</span>
+        </a>
+    </div>
+
+    <!-- QUICK STATS -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="glass-card p-6 rounded-3xl">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-accent">
+                    <i class="fas fa-file-invoice-dollar text-xl"></i>
+                </div>
+                <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Active Apps</span>
+            </div>
+            <h3 class="text-2xl font-black text-primary">Manage Loans</h3>
+            <p class="text-sm text-gray-500 mt-1">Track your pending and approved loans.</p>
+        </div>
+
+        <div class="glass-card p-6 rounded-3xl">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center text-green-600">
+                    <i class="fas fa-shield-halved text-xl"></i>
+                </div>
+                <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Security</span>
+            </div>
+            <h3 class="text-2xl font-black text-primary">Fraud Protected</h3>
+            <p class="text-sm text-gray-500 mt-1">Your data is secured with AI encryption.</p>
+        </div>
+
+        <div class="glass-card p-6 rounded-3xl">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center text-purple-600">
+                    <i class="fas fa-chart-line text-xl"></i>
+                </div>
+                <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Insights</span>
+            </div>
+            <h3 class="text-2xl font-black text-primary">AI Guidance</h3>
+            <p class="text-sm text-gray-500 mt-1">Personalized tips to improve your score.</p>
+        </div>
+    </div>
+
+    <!-- RECENT ACTIVITY SECTION -->
+    <div class="glass-card rounded-3xl overflow-hidden">
+        <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+            <h3 class="font-bold text-primary text-xl">Quick Actions</h3>
+        </div>
+        <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <a href="/history" class="flex items-center p-4 rounded-2xl hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-all group">
+                <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-gray-600 group-hover:bg-accent group-hover:text-white transition-all mr-4">
+                    <i class="fas fa-history"></i>
+                </div>
+                <div>
+                    <h4 class="font-bold text-primary">Application History</h4>
+                    <p class="text-xs text-gray-500">View all your past loan decisions</p>
+                </div>
+                <i class="fas fa-chevron-right ml-auto text-gray-300"></i>
+            </a>
+            
+            <a href="/apply" class="flex items-center p-4 rounded-2xl hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-all group">
+                <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-gray-600 group-hover:bg-accent group-hover:text-white transition-all mr-4">
+                    <i class="fas fa-calculator"></i>
+                </div>
+                <div>
+                    <h4 class="font-bold text-primary">Check Eligibility</h4>
+                    <p class="text-xs text-gray-500">Run a new AI analysis in seconds</p>
+                </div>
+                <i class="fas fa-chevron-right ml-auto text-gray-300"></i>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

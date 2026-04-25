@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="space-y-8">
+    <div class="flex justify-between items-center">
+        <h1 class="text-3xl font-black text-primary">Admin Control Center</h1>
+        <div class="flex items-center space-x-2 bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-100">
+            <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+            <span class="text-sm font-bold text-gray-500 uppercase tracking-widest">System Live</span>
+        </div>
+    </div>
+
+    <!-- STATS OVERVIEW -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div class="glass-card p-6 rounded-3xl">
+            <span class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Total Applications</span>
+            <div class="flex items-end space-x-2">
+                <span class="text-4xl font-black text-primary">{{ total }}</span>
+                <i class="fas fa-arrow-up text-green-500 mb-2 text-sm"></i>
+            </div>
+        </div>
+        <div class="glass-card p-6 rounded-3xl">
+            <span class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Approval Rate</span>
+            <div class="flex items-end space-x-2">
+                <span class="text-4xl font-black text-primary">
+                    {% if total > 0 %}{{ (approved / total * 100)|round|int }}%{% else %}0%{% endif %}
+                </span>
+            </div>
+        </div>
+        <div class="glass-card p-6 rounded-3xl border-red-100">
+            <span class="block text-xs font-bold text-red-400 uppercase tracking-widest mb-2">Fraud Alerts</span>
+            <div class="flex items-end space-x-2">
+                <span class="text-4xl font-black text-red-600">{{ fraud }}</span>
+                {% if fraud > 0 %}
+                <i class="fas fa-exclamation-triangle text-red-500 mb-2 text-sm"></i>
+                {% endif %}
+            </div>
+        </div>
+        <div class="glass-card p-6 rounded-3xl">
+            <span class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Avg Risk Score</span>
+            <div class="flex items-end space-x-2">
+                <span class="text-4xl font-black text-accent">42%</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ANALYTICS & RECENT -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- CHART -->
+        <div class="lg:col-span-1 glass-card p-8 rounded-3xl flex flex-col items-center justify-center">
+            <h3 class="font-bold text-primary mb-6 self-start">Approval Distribution</h3>
+            <canvas id="adminChart" class="max-w-[250px]"></canvas>
+        </div>
+
+        <!-- RECENT TABLE -->
+        <div class="lg:col-span-2 glass-card rounded-3xl overflow-hidden">
+            <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+                <h3 class="font-bold text-primary">Recent Global Activity</h3>
+                <button class="text-accent text-sm font-bold hover:underline">Export CSV</button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead class="bg-gray-50/50">
+                        <tr>
+                            <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">User</th>
+                            <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Loan</th>
+                            <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Risk</th>
+                            <th class="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                        {% for app in recent %}
+                        <tr class="hover:bg-gray-50/50 transition-colors">
+                            <td class="px-6 py-4">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-xs font-bold text-gray-500">
+                                        {{ app[0][0] }}
+                                    </div>
+                                    <span class="font-bold text-primary">{{ app[0] }}</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 font-bold text-gray-600">${{ app[1] }}</td>
+                            <td class="px-6 py-4">
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-full bg-gray-100 h-1.5 rounded-full w-20 overflow-hidden">
+                                        <div class="bg-accent h-full" style="width: {{ app[2] }}%"></div>
+                                    </div>
+                                    <span class="text-xs font-bold text-gray-400">{{ app[2] }}%</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                {% if app[4] == 1 %}
+                                <span class="px-3 py-1 bg-red-100 text-red-600 rounded-lg text-[10px] font-black uppercase">Fraud</span>
+                                {% else %}
+                                <span class="px-3 py-1 {% if app[3] == 'Approved' %}bg-green-100 text-green-600{% else %}bg-gray-100 text-gray-500{% endif %} rounded-lg text-[10px] font-black uppercase">
+                                    {{ app[3] }}
+                                </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const ctx = document.getElementById('adminChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Approved', 'Rejected'],
+            datasets: [{
+                data: [{{ approved }}, {{ total - approved }}],
+                backgroundColor: ['#3b82f6', '#f1f5f9'],
+                borderWidth: 0,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            plugins: {
+                legend: { position: 'bottom' }
+            },
+            cutout: '70%'
+        }
+    });
+</script>
+{% endblock %}
