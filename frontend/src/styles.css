@@ -510,7 +510,7 @@ select:focus {
 
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
 }
 
@@ -529,6 +529,10 @@ select:focus {
 
 .stat-card.red svg {
   color: #ef4444;
+}
+
+.stat-card.amber svg {
+  color: #d97706;
 }
 
 .analytics-grid,
@@ -577,6 +581,11 @@ select:focus {
   background: #fee2e2;
 }
 
+.status.risky {
+  color: #92400e;
+  background: #fef3c7;
+}
+
 .form-layout {
   align-items: start;
 }
@@ -588,6 +597,93 @@ select:focus {
 
 .loan-form {
   display: grid;
+}
+
+.simulator-panel {
+  margin-top: 22px;
+  display: grid;
+  gap: 16px;
+}
+
+.simulator-head,
+.preview-score {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.preview-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.preview-copy strong {
+  font-size: 1.2rem;
+}
+
+.preview-note {
+  margin: 0;
+}
+
+.tenure-smart-field {
+  position: relative;
+  min-height: 84px;
+}
+
+.tenure-field-stage {
+  position: absolute;
+  inset: 0;
+}
+
+.tenure-smart-field select,
+.tenure-custom-entry input {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid rgba(148, 163, 184, 0.42);
+  border-radius: 12px;
+  padding: 0 14px;
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.88);
+  outline: 0;
+  transition: opacity 180ms ease, transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.tenure-smart-field select:focus,
+.tenure-custom-entry input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+}
+
+.tenure-custom-entry {
+  display: grid;
+  gap: 10px;
+  animation: tenure-enter 180ms ease;
+}
+
+.tenure-back-btn {
+  justify-self: start;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #2563eb;
+  font-weight: 800;
+  font-size: 0.92rem;
+}
+
+.tenure-back-btn:hover {
+  color: #1d4ed8;
+}
+
+@keyframes tenure-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .decision-panel {
@@ -612,6 +708,10 @@ select:focus {
   background: linear-gradient(135deg, #14532d, #16a34a);
 }
 
+.risky-bg {
+  background: linear-gradient(135deg, #9a3412, #f59e0b);
+}
+
 .rejected-bg {
   background: linear-gradient(135deg, #7f1d1d, #ef4444);
 }
@@ -620,6 +720,79 @@ select:focus {
   color: white;
   background: conic-gradient(#2563eb 0 210deg, #e2e8f0 210deg);
   margin: 20px 0;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metric-grid.compact {
+  margin-top: 16px;
+}
+
+.metric-card {
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  display: grid;
+  gap: 5px;
+}
+
+.metric-card span {
+  color: #64748b;
+  font-size: 0.86rem;
+}
+
+.metric-card strong {
+  color: #0f172a;
+  font-size: 1rem;
+}
+
+.decision-metrics .metric-card {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.decision-metrics .metric-card span,
+.decision-metrics .metric-card strong {
+  color: white;
+}
+
+.result-wide {
+  grid-column: 1 / -1;
+}
+
+.factor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.factor-card {
+  padding: 16px;
+  border-radius: 14px;
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: white;
+}
+
+.factor-card span {
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.factor-card.negative {
+  background: #fff7f7;
+  border-color: rgba(239, 68, 68, 0.16);
+}
+
+.factor-card.positive {
+  background: #f3fbf6;
+  border-color: rgba(22, 163, 74, 0.16);
 }
 
 .clean-list {
@@ -896,7 +1069,9 @@ select:focus {
   }
 
   .feature-grid,
-  .stat-grid {
+  .stat-grid,
+  .factor-grid,
+  .metric-grid {
     grid-template-columns: 1fr;
   }
 

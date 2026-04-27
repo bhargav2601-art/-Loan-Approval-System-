@@ -9,7 +9,6 @@ import {
   ChevronRight,
   CircleDollarSign,
   Clock3,
-  KeyRound,
   Landmark,
   LockKeyhole,
   LogOut,
@@ -17,9 +16,8 @@ import {
   Menu,
   MessageCircle,
   PieChart,
-  Send,
+  ShieldAlert,
   ShieldCheck,
-  Smartphone,
   Sparkles,
   Table2,
   TrendingUp,
@@ -61,11 +59,15 @@ function currency(value) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(value || 0);
 }
 
+function formatPercent(value) {
+  return `${Number(value || 0).toFixed(1)}%`;
+}
+
 function App() {
   const [user, setUser] = useState(null);
   const [view, setView] = useState('landing');
   const [authRole, setAuthRole] = useState('user');
-  const [history, setHistory] = useState({ loans: [], stats: { total: 0, approved: 0, rejected: 0 } });
+  const [history, setHistory] = useState({ loans: [], stats: { total: 0, approved: 0, risky: 0, rejected: 0 } });
   const [latestResult, setLatestResult] = useState(null);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -93,7 +95,7 @@ function App() {
   async function logout() {
     await api('/api/logout', { method: 'POST', body: '{}' });
     setUser(null);
-    setHistory({ loans: [], stats: { total: 0, approved: 0, rejected: 0 } });
+    setHistory({ loans: [], stats: { total: 0, approved: 0, risky: 0, rejected: 0 } });
     setLatestResult(null);
     setView('landing');
   }
@@ -215,18 +217,14 @@ function Landing({ onStart }) {
   );
 }
 
+
 function Login({ initialRole = 'user', onAuthed }) {
   const [role, setRole] = useState(initialRole);
   const [mode, setMode] = useState('login');
-  const [authMethod, setAuthMethod] = useState(initialRole === 'admin' ? 'email' : 'otp');
-  const [otpSent, setOtpSent] = useState(false);
-  const [devOtp, setDevOtp] = useState('');
   const [form, setForm] = useState({
     name: '',
-    email: initialRole === 'admin' ? 'admin@smartloan.ai' : 'customer@gmail.com',
-    password: initialRole === 'admin' ? 'Admin@123' : 'Customer@123',
-    phone: '9876543210',
-    otp: '',
+    email: '',
+    password: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -238,29 +236,8 @@ function Login({ initialRole = 'user', onAuthed }) {
   function switchRole(nextRole) {
     setRole(nextRole);
     setError('');
-    if (nextRole === 'admin') {
-      setMode('login');
-      setAuthMethod('email');
-      setOtpSent(false);
-      setForm({ name: '', email: 'admin@smartloan.ai', password: 'Admin@123', phone: '', otp: '' });
-    } else {
-      setAuthMethod('otp');
-      setForm({ name: '', email: 'customer@gmail.com', password: 'Customer@123', phone: '9876543210', otp: '' });
-    }
-  }
-
-  async function sendOtp() {
-    setError('');
-    setLoading(true);
-    try {
-      const data = await api('/api/send_otp', { method: 'POST', body: JSON.stringify({ phone: form.phone }) });
-      setOtpSent(true);
-      setDevOtp(data.dev_otp || '');
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    setMode('login');
+    setForm({ name: '', email: '', password: '' });
   }
 
   async function submit(event) {
@@ -268,11 +245,6 @@ function Login({ initialRole = 'user', onAuthed }) {
     setError('');
     setLoading(true);
     try {
-      if (role === 'user' && authMethod === 'otp') {
-        const data = await api('/api/verify_otp', { method: 'POST', body: JSON.stringify({ phone: form.phone, otp: form.otp }) });
-        onAuthed(data.user);
-        return;
-      }
       const path = mode === 'register' ? '/api/register' : '/api/login';
       const payload = mode === 'register'
         ? { name: form.name, email: form.email, password: form.password }
@@ -286,73 +258,63 @@ function Login({ initialRole = 'user', onAuthed }) {
     }
   }
 
+  const adminTitle = 'Admin Portal';
+  const userTitle = 'Welcome Back';
+  const adminDesc = 'Access the admin dashboard to manage loan applications and view analytics.';
+  const userDesc = 'Sign in to apply for loans or continue as guest to explore.';
+
   return (
     <section className="auth-wrap">
       <div className="auth-card">
-        <span className="eyebrow"><LockKeyhole size={16} /> Role-based secure login</span>
-        <h2>{role === 'admin' ? 'Bank officer access' : 'Customer access'}</h2>
-        <p>{role === 'admin' ? 'Admin users can monitor applications, risk, fraud flags, and portfolio insights.' : 'Customers can register, apply for loans, view history, and chat with the AI assistant.'}</p>
+        <span className="eyebrow"><LockKeyhole size={16} /> Secure authentication</span>
+        <h2>{role === 'admin' ? adminTitle : userTitle}</h2>
+        <p>{role === 'admin' ? adminDesc : userDesc}</p>
 
         <div className="segmented">
-          <button className={role === 'user' ? 'selected' : ''} onClick={() => switchRole('user')} type="button"><UserRound size={16} /> User Login</button>
-          <button className={role === 'admin' ? 'selected' : ''} onClick={() => switchRole('admin')} type="button"><ShieldCheck size={16} /> Admin Login</button>
+          <button className={role === 'user' ? 'selected' : ''} onClick={() => switchRole('user')} type="button"><UserRound size={16} /> User</button>
+          <button className={role === 'admin' ? 'selected' : ''} onClick={() => switchRole('admin')} type="button"><ShieldCheck size={16} /> Admin</button>
         </div>
 
-        {role === 'user' && (
-          <div className="mode-switch">
-            <button className={authMethod === 'otp' ? 'active' : ''} onClick={() => { setAuthMethod('otp'); setMode('login'); setError(''); }} type="button"><Smartphone size={16} /> OTP</button>
-            <button className={authMethod === 'email' ? 'active' : ''} onClick={() => { setAuthMethod('email'); setError(''); }} type="button"><Mail size={16} /> Email</button>
-          </div>
-        )}
-
         <form onSubmit={submit}>
-          {role === 'user' && authMethod === 'otp' ? (
+          {role === 'user' && (
+            <div className="mode-switch compact-switch">
+              <button className={mode === 'login' ? 'active' : ''} onClick={() => setMode('login')} type="button">Sign In</button>
+              <button className={mode === 'register' ? 'active' : ''} onClick={() => setMode('register')} type="button">Register</button>
+            </div>
+          )}
+          
+          {mode === 'register' && role === 'user' && (
             <>
-              <label>Phone number</label>
-              <div className="otp-row">
-                <div className="input-icon"><Smartphone size={18} /><input value={form.phone} onChange={(event) => update('phone', event.target.value)} placeholder="9876543210" /></div>
-                <button className="secondary-btn" type="button" onClick={sendOtp} disabled={loading}>{loading ? <span className="spinner dark" /> : <><Send size={16} /> Send OTP</>}</button>
-              </div>
-              <label>Verification code</label>
-              <div className="input-icon"><KeyRound size={18} /><input value={form.otp} onChange={(event) => update('otp', event.target.value)} placeholder="6-digit OTP" inputMode="numeric" /></div>
-              {otpSent && <span className="demo-code">Demo OTP sent. Local code: {devOtp}</span>}
-            </>
-          ) : (
-            <>
-              {role === 'user' && (
-                <div className="mode-switch compact-switch">
-                  <button className={mode === 'login' ? 'active' : ''} onClick={() => setMode('login')} type="button">Login</button>
-                  <button className={mode === 'register' ? 'active' : ''} onClick={() => setMode('register')} type="button">Register</button>
-                </div>
-              )}
-              {mode === 'register' && role === 'user' && (
-                <>
-                  <label>Full name</label>
-                  <div className="input-icon"><UserPlus size={18} /><input value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="Aarav Sharma" /></div>
-                </>
-              )}
-              <label>Email address</label>
-              <div className="input-icon"><Mail size={18} /><input type="email" value={form.email} onChange={(event) => update('email', event.target.value)} placeholder="name@gmail.com" /></div>
-              <label>Password</label>
-              <div className="input-icon"><LockKeyhole size={18} /><input type="password" value={form.password} onChange={(event) => update('password', event.target.value)} placeholder="Enter password" /></div>
+              <label>Full name</label>
+              <div className="input-icon"><UserPlus size={18} /><input value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="Enter your full name" /></div>
             </>
           )}
-          {role === 'admin' && <span className="demo-code">Demo admin: admin@smartloan.ai / Admin@123</span>}
-          {role === 'user' && authMethod === 'email' && mode === 'login' && <span className="demo-code">Demo user: customer@gmail.com / Customer@123</span>}
+          
+          <label>Email address</label>
+          <div className="input-icon"><Mail size={18} /><input type="email" value={form.email} onChange={(event) => update('email', event.target.value)} placeholder={role === 'admin' ? "Enter admin credentials" : "name@example.com"} /></div>
+          
+          <label>Password</label>
+          <div className="input-icon"><LockKeyhole size={18} /><input type="password" value={form.password} onChange={(event) => update('password', event.target.value)} placeholder="Enter password" /></div>
+          
           {error && <div className="error"><XCircle size={16} /> {error}</div>}
           <button className="primary-btn full" disabled={loading}>
-            {loading ? <span className="spinner" /> : role === 'user' && authMethod === 'otp' ? 'Verify OTP & Login' : mode === 'register' ? 'Create User Account' : `Login as ${role === 'admin' ? 'Admin' : 'User'}`}
+            {loading ? <span className="spinner" /> : mode === 'register' ? 'Create Account' : "Sign In as " + (role === 'admin' ? 'Admin' : 'User')}
           </button>
+          
+          {role === 'user' && mode === 'login' && (
+            <button type="button" className="ghost-btn full" onClick={() => onAuthed({ id: 0, name: 'Guest User', email: 'guest', role: 'user' })}>
+              Continue as Guest
+            </button>
+          )}
         </form>
       </div>
     </section>
   );
 }
-
 function Dashboard({ user, history, onApply }) {
   const doughnutData = useMemo(() => ({
-    labels: ['Approved', 'Rejected'],
-    datasets: [{ data: [history.stats.approved, history.stats.rejected], backgroundColor: ['#16a34a', '#ef4444'], borderWidth: 0 }],
+    labels: ['Approved', 'Risky', 'Rejected'],
+    datasets: [{ data: [history.stats.approved, history.stats.risky, history.stats.rejected], backgroundColor: ['#16a34a', '#f59e0b', '#ef4444'], borderWidth: 0 }],
   }), [history]);
 
   const barData = useMemo(() => ({
@@ -372,7 +334,9 @@ function Dashboard({ user, history, onApply }) {
       <div className="stat-grid">
         <Stat icon={CircleDollarSign} label="Applications" value={history.stats.total} />
         <Stat icon={CheckCircle2} label="Approved" value={history.stats.approved} tone="green" />
+        <Stat icon={ShieldAlert} label="Risky" value={history.stats.risky} tone="amber" />
         <Stat icon={XCircle} label="Rejected" value={history.stats.rejected} tone="red" />
+        <Stat icon={ShieldCheck} label="Avg Confidence" value={formatPercent(history.stats.avg_confidence)} />
       </div>
       <div className="analytics-grid">
         <div className="panel"><h3>Approval mix</h3><Doughnut data={doughnutData} options={{ cutout: '72%', plugins: { legend: { position: 'bottom' } } }} /></div>
@@ -422,26 +386,136 @@ function HistoryTable({ loans }) {
 }
 
 function LoanForm({ onResult }) {
+  const presetTenureYears = ['1', '2', '3', '5', '10'];
   const [form, setForm] = useState({
     income: '',
     credit_score: '',
     employment_status: 'salaried',
     loan_amount: '',
     existing_loans: '',
+    loan_type: 'Personal Loan',
+    previous_loan: 'No',
+    previous_loan_amount: '',
+    loan_tenure: '24',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [scenario, setScenario] = useState(null);
+  const [scenarioError, setScenarioError] = useState('');
+  const [simulating, setSimulating] = useState(false);
+  const [tenureMode, setTenureMode] = useState('list');
+  const [customTenureYears, setCustomTenureYears] = useState('');
+  const [selectedTenureYears, setSelectedTenureYears] = useState('2');
 
   function update(key, value) {
-    setForm((current) => ({ ...current, [key]: value }));
+    setForm((current) => {
+      const newForm = { ...current, [key]: value };
+
+      if (key === 'previous_loan' && value === 'No') {
+        newForm.previous_loan_amount = '';
+      }
+
+      return newForm;
+    });
   }
+
+  function selectTenure(value) {
+    if (value === 'other') {
+      setTenureMode('custom');
+      setError('');
+      return;
+    }
+
+    setTenureMode('list');
+    setSelectedTenureYears(value);
+    setCustomTenureYears('');
+    update('loan_tenure', String(Number(value) * 12));
+  }
+
+  function handleCustomTenure(value) {
+    const sanitized = value.replace(/\D/g, '');
+    setCustomTenureYears(sanitized);
+    setError('');
+    if (!sanitized) return;
+
+    const years = Number(sanitized);
+    if (years >= 1 && years <= 30) {
+      update('loan_tenure', String(years * 12));
+    }
+  }
+
+  function usePresetTenure() {
+    setTenureMode('list');
+    setCustomTenureYears('');
+    setError('');
+    update('loan_tenure', String(Number(selectedTenureYears) * 12));
+  }
+
+  function buildPayload(strict = false) {
+    const required = ['income', 'credit_score', 'loan_amount', 'loan_type', 'employment_status', 'previous_loan'];
+    if (required.some((field) => !String(form[field] ?? '').trim())) return null;
+
+    let tenureMonths = form.loan_tenure;
+    if (tenureMode === 'custom') {
+      if (!customTenureYears) return null;
+      const years = Number(customTenureYears);
+      if (!Number.isInteger(years) || years < 1 || years > 30) {
+        if (strict) {
+          setError('Loan tenure must be between 1 and 30 years.');
+        }
+        return null;
+      }
+      tenureMonths = String(years * 12);
+    }
+
+    if (form.previous_loan === 'Yes' && !String(form.previous_loan_amount || '').trim()) {
+      if (strict) {
+        setError('Please enter your previous loan amount.');
+      }
+      return null;
+    }
+
+    return {
+      ...form,
+      existing_loans: form.existing_loans || '0',
+      loan_tenure: tenureMonths,
+    };
+  }
+
+  useEffect(() => {
+    const payload = buildPayload(false);
+    if (!payload) {
+      setScenario(null);
+      setScenarioError('');
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(async () => {
+      setSimulating(true);
+      try {
+        const data = await api('/api/simulate', { method: 'POST', body: JSON.stringify(payload) });
+        setScenario(data);
+        setScenarioError('');
+      } catch (err) {
+        setScenario(null);
+        setScenarioError(err.message);
+      } finally {
+        setSimulating(false);
+      }
+    }, 280);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [form, tenureMode, customTenureYears, selectedTenureYears]);
 
   async function submit(event) {
     event.preventDefault();
     setError('');
+    const payload = buildPayload(true);
+    if (!payload) return;
+
     setLoading(true);
     try {
-      const data = await api('/api/predict', { method: 'POST', body: JSON.stringify(form) });
+      const data = await api('/api/predict', { method: 'POST', body: JSON.stringify(payload) });
       onResult(data);
     } catch (err) {
       setError(err.message);
@@ -455,10 +529,40 @@ function LoanForm({ onResult }) {
       <div className="form-intro">
         <span className="eyebrow"><PieChart size={16} /> AI underwriting</span>
         <h2>Loan Application</h2>
-        <p>Enter the core lending signals and get an instant decision with explainable reasoning.</p>
+        <p>Enter your details and choose a loan tenure. We'll calculate your EMI and provide an instant decision with explainable reasoning.</p>
+        <div className="panel simulator-panel">
+          <div className="simulator-head">
+            <div>
+              <span className="muted">What-if simulator</span>
+              <h3>Live affordability preview</h3>
+            </div>
+            {simulating && <span className="muted">Refreshing...</span>}
+          </div>
+          {scenario ? (
+            <>
+              <div className="preview-score">
+                <RiskMeter score={scenario.risk_score} />
+                <div className="preview-copy">
+                  <strong>{scenario.status}</strong>
+                  <span>{formatPercent(scenario.approval_probability)} approval probability</span>
+                  <span>{formatPercent(scenario.confidence_score)} confidence</span>
+                </div>
+              </div>
+              <div className="metric-grid compact">
+                <Metric label="EMI" value={currency(scenario.calculated_emi)} />
+                <Metric label="Rate" value={formatPercent(scenario.interest_rate)} />
+                <Metric label="DTI" value={formatPercent(scenario.metrics.dti_ratio)} />
+                <Metric label="EMI / Income" value={formatPercent(scenario.metrics.emi_to_income_ratio)} />
+              </div>
+              <p className="muted preview-note">{scenario.top_factors[0]?.title || 'Fill in the form to preview the strongest underwriting signal.'}</p>
+            </>
+          ) : (
+            <p className="muted preview-note">{scenarioError || 'The simulator will start once the key affordability fields are filled.'}</p>
+          )}
+        </div>
       </div>
       <form className="loan-form" onSubmit={submit}>
-        <Field label="Monthly income" value={form.income} onChange={(value) => update('income', value)} placeholder="65000" />
+        <Field label="Monthly income (₹)" value={form.income} onChange={(value) => update('income', value)} placeholder="65000" />
         <Field label="Credit score" value={form.credit_score} onChange={(value) => update('credit_score', value)} placeholder="720" />
         <label>Employment status</label>
         <select value={form.employment_status} onChange={(event) => update('employment_status', event.target.value)}>
@@ -468,10 +572,62 @@ function LoanForm({ onResult }) {
           <option value="student">Student</option>
           <option value="unemployed">Unemployed</option>
         </select>
-        <Field label="Loan amount" value={form.loan_amount} onChange={(value) => update('loan_amount', value)} placeholder="350000" />
-        <Field label="Existing loans" value={form.existing_loans} onChange={(value) => update('existing_loans', value)} placeholder="80000" />
+        <Field label="Loan amount (₹)" value={form.loan_amount} onChange={(value) => update('loan_amount', value)} placeholder="350000" />
+        <Field label="Existing EMIs / loans outstanding (₹)" value={form.existing_loans} onChange={(value) => update('existing_loans', value)} placeholder="15000" />
+        
+        <label>Loan type</label>
+        <select value={form.loan_type} onChange={(event) => update('loan_type', event.target.value)}>
+          <option value="Personal Loan">Personal Loan</option>
+          <option value="Home Loan">Home Loan</option>
+          <option value="Vehicle Loan">Vehicle Loan</option>
+          <option value="Education Loan">Education Loan</option>
+        </select>
+        
+        <label>Do you have any previous loan?</label>
+        <select value={form.previous_loan} onChange={(event) => update('previous_loan', event.target.value)}>
+          <option value="No">No</option>
+          <option value="Yes">Yes</option>
+        </select>
+        
+        {form.previous_loan === 'Yes' && (
+          <Field label="Previous loan amount (₹)" value={form.previous_loan_amount} onChange={(value) => update('previous_loan_amount', value)} placeholder="Enter previous loan amount" />
+        )}
+
+        <label>Loan tenure</label>
+        <div className={`tenure-smart-field ${tenureMode === 'custom' ? 'is-custom' : ''}`}>
+          <div className="tenure-field-stage">
+            {tenureMode === 'list' ? (
+              <select
+                value={selectedTenureYears}
+                onChange={(event) => selectTenure(event.target.value)}
+              >
+                {presetTenureYears.map((years) => (
+                  <option key={years} value={years}>{years} {years === '1' ? 'year' : 'years'}</option>
+                ))}
+                <option value="other">Other...</option>
+              </select>
+            ) : (
+              <div className="tenure-custom-entry">
+                <input
+                  type="number"
+                  min="1"
+                  max="30"
+                  step="1"
+                  inputMode="numeric"
+                  value={customTenureYears}
+                  onChange={(event) => handleCustomTenure(event.target.value)}
+                  placeholder="Enter tenure in years"
+                />
+                <button type="button" className="tenure-back-btn" onClick={usePresetTenure}>
+                  ← Choose from list
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
         {error && <div className="error"><XCircle size={16} /> {error}</div>}
-        <button className="primary-btn full" disabled={loading}>{loading ? <span className="spinner" /> : 'Run AI Decision'}</button>
+        <button className="primary-btn full" disabled={loading}>{loading ? <span className="spinner" /> : 'Get AI Decision'}</button>
       </form>
     </section>
   );
@@ -486,21 +642,49 @@ function Field({ label, value, onChange, placeholder }) {
   );
 }
 
+function Metric({ label, value }) {
+  return <div className="metric-card"><span>{label}</span><strong>{value}</strong></div>;
+}
+
+function RiskMeter({ score }) {
+  const degrees = Math.max(18, Math.min(342, Number(score || 0) * 3.2));
+  return <div className="score-orb dynamic" style={{ background: `conic-gradient(#2563eb 0 ${degrees}deg, #dbeafe ${degrees}deg 360deg)` }}>{Math.round(score || 0)}</div>;
+}
+
 function Result({ result, onApply }) {
   if (!result) return <section className="panel empty-state"><h2>No result yet</h2><button className="primary-btn" onClick={onApply}>Create Application</button></section>;
   const approved = result.status === 'Approved';
+  const risky = result.status === 'Risky';
+  const toneClass = approved ? 'approved-bg' : risky ? 'risky-bg' : 'rejected-bg';
+  const toneCopy = approved
+    ? 'This profile clears the AI lending policy.'
+    : risky
+      ? 'This profile is conditionally approvable but needs additional affordability review.'
+      : 'The current profile needs improvement before approval.';
   return (
     <section className="result-grid">
-      <div className={`decision-panel ${approved ? 'approved-bg' : 'rejected-bg'}`}>
-        {approved ? <CheckCircle2 size={44} /> : <XCircle size={44} />}
+      <div className={`decision-panel ${toneClass}`}>
+        {approved ? <CheckCircle2 size={44} /> : risky ? <ShieldAlert size={44} /> : <XCircle size={44} />}
         <span>Loan Status</span>
         <h2>{result.status}</h2>
-        <p>{approved ? 'This profile clears the AI lending policy.' : 'The current profile needs improvement before approval.'}</p>
+        <p>{toneCopy}</p>
+        <div className="metric-grid decision-metrics">
+          <Metric label="EMI" value={currency(result.calculated_emi)} />
+          <Metric label="Rate" value={formatPercent(result.interest_rate)} />
+          <Metric label="Approval" value={formatPercent(result.approval_probability)} />
+          <Metric label="Confidence" value={formatPercent(result.confidence_score)} />
+        </div>
       </div>
       <div className="panel risk-card">
         <h3>Risk Score</h3>
-        <div className="score-orb">{result.risk_score}</div>
+        <RiskMeter score={result.risk_score} />
         <strong>{result.risk_category} risk</strong>
+        <div className="metric-grid compact">
+          <Metric label="DTI" value={formatPercent(result.metrics.dti_ratio)} />
+          <Metric label="EMI / Income" value={formatPercent(result.metrics.emi_to_income_ratio)} />
+          <Metric label="Utilization" value={formatPercent(result.metrics.credit_utilization)} />
+          <Metric label="Stability" value={formatPercent(result.metrics.income_stability_factor)} />
+        </div>
       </div>
       <div className="panel">
         <h3>Decision explanation</h3>
@@ -510,6 +694,17 @@ function Result({ result, onApply }) {
         <h3>Suggestions</h3>
         <ul className="clean-list">{result.suggestions.map((item) => <li key={item}><Sparkles size={16} /> {item}</li>)}</ul>
         <button className="secondary-btn" onClick={onApply}>Try another scenario</button>
+      </div>
+      <div className="panel result-wide">
+        <h3>Top contributing factors</h3>
+        <div className="factor-grid">
+          {result.top_factors.map((factor) => (
+            <div className={`factor-card ${factor.direction}`} key={factor.feature}>
+              <strong>{factor.title}</strong>
+              <span>{factor.suggestion}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -614,10 +809,10 @@ function Admin() {
     api('/api/admin/stats').then(setStats).catch((err) => setError(err.message));
   }, []);
 
-  if (error) return <section className="panel empty-state"><h2>{error}</h2><p>Login with the seeded bank officer account: admin@smartloan.ai.</p></section>;
+  if (error) return <section className="panel empty-state"><h2>{error}</h2><p>Login with the bank officer account: admin@loanai.com</p></section>;
   if (!stats) return <section className="panel empty-state"><span className="spinner" /></section>;
 
-  const data = { labels: ['Approved', 'Rejected'], datasets: [{ data: [stats.approved, stats.rejected], backgroundColor: ['#16a34a', '#ef4444'], borderWidth: 0 }] };
+  const data = { labels: ['Approved', 'Risky', 'Rejected'], datasets: [{ data: [stats.approved, stats.risky, stats.rejected], backgroundColor: ['#16a34a', '#f59e0b', '#ef4444'], borderWidth: 0 }] };
   const incomeData = {
     labels: stats.income_groups.map((item) => item.group),
     datasets: [{ label: 'Rejected applications', data: stats.income_groups.map((item) => item.rejected), backgroundColor: '#ef4444', borderRadius: 8 }],
@@ -633,6 +828,7 @@ function Admin() {
       <div className="stat-grid">
         <Stat icon={UserRound} label="Users" value={stats.total_users} />
         <Stat icon={CircleDollarSign} label="Applications" value={stats.total_applications} />
+        <Stat icon={ShieldAlert} label="Risky" value={stats.risky} tone="amber" />
         <Stat icon={XCircle} label="Rejected" value={stats.rejected} tone="red" />
       </div>
       <div className="analytics-grid">
