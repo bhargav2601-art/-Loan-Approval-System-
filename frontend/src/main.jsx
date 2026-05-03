@@ -55,6 +55,13 @@ async function api(path, options = {}) {
   return data;
 }
 
+function resolveAssetUrl(path) {
+  if (!path) return '';
+  if (/^https?:\/\//.test(path)) return path;
+  if (!API_BASE) return path;
+  return `${API_BASE}${path}`;
+}
+
 function currency(value) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(value || 0);
 }
@@ -63,24 +70,53 @@ function formatPercent(value) {
   return `${Number(value || 0).toFixed(1)}%`;
 }
 
+function routeToView(pathname) {
+  if (pathname === '/model-insights') return 'model-insights';
+  return 'landing';
+}
+
+function viewToRoute(view) {
+  if (view === 'model-insights') return '/model-insights';
+  return '/';
+}
+
 function App() {
   const [user, setUser] = useState(null);
-  const [view, setView] = useState('landing');
+  const [view, setView] = useState(() => routeToView(window.location.pathname));
   const [authRole, setAuthRole] = useState('user');
   const [history, setHistory] = useState({ loans: [], stats: { total: 0, approved: 0, risky: 0, rejected: 0 } });
   const [latestResult, setLatestResult] = useState(null);
+  const [latestFormData, setLatestFormData] = useState(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [formResetToken, setFormResetToken] = useState(0);
 
   useEffect(() => {
     api('/api/me')
       .then((data) => {
         if (data.user) {
           setUser(data.user);
-          setView(data.user.role === 'admin' ? 'admin' : 'dashboard');
+          if (window.location.pathname === '/model-insights' && data.user.role === 'admin') {
+            setView('model-insights');
+          } else {
+            setView(data.user.role === 'admin' ? 'admin' : 'dashboard');
+          }
         }
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const onPopState = () => setView(routeToView(window.location.pathname));
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  useEffect(() => {
+    const nextPath = viewToRoute(view);
+    if (window.location.pathname !== nextPath) {
+      window.history.replaceState({}, '', nextPath);
+    }
+  }, [view]);
 
   async function refreshHistory() {
     if (!user) return;
@@ -97,7 +133,17 @@ function App() {
     setUser(null);
     setHistory({ loans: [], stats: { total: 0, approved: 0, risky: 0, rejected: 0 } });
     setLatestResult(null);
+    setLatestFormData(null);
     setView('landing');
+  }
+
+  function startNewApplication() {
+    setLatestResult(null);
+    setLatestFormData(null);
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    setFormResetToken((current) => current + 1);
+    setView('apply');
   }
 
   const navItems = user
@@ -106,6 +152,7 @@ function App() {
         ['apply', user.role === 'user' ? 'Apply' : null],
         ['profile', 'Profile'],
         ['admin', user.role === 'admin' ? 'Admin' : null],
+        ['model-insights', user.role === 'admin' ? 'Model Insights' : null],
       ].filter((item) => item[1])
     : [];
 
@@ -153,12 +200,13 @@ function App() {
         {view === 'landing' && <Landing onStart={() => setView('login')} />}
         {view === 'login' && <Login initialRole={authRole} onAuthed={(nextUser) => { setUser(nextUser); setView(nextUser.role === 'admin' ? 'admin' : 'dashboard'); }} />}
         {view === 'admin-login' && <Login initialRole="admin" onAuthed={(nextUser) => { setUser(nextUser); setView(nextUser.role === 'admin' ? 'admin' : 'dashboard'); }} />}
-        {view === 'dashboard' && user?.role === 'user' && <Dashboard user={user} history={history} onApply={() => setView('apply')} />}
-        {view === 'apply' && user?.role === 'user' && <LoanForm onResult={(result) => { setLatestResult(result); refreshHistory(); setView('result'); }} />}
-        {view === 'result' && user?.role === 'user' && <Result result={latestResult || history.loans[0]} onApply={() => setView('apply')} />}
+        {view === 'dashboard' && user?.role === 'user' && <Dashboard user={user} history={history} onApply={startNewApplication} />}
+        {view === 'apply' && user?.role === 'user' && <LoanForm resetToken={formResetToken} onResult={(result, formData) => { setLatestResult(result); setLatestFormData(formData); refreshHistory(); setView('result'); }} />}
+        {view === 'result' && user?.role === 'user' && <Result result={latestResult || history.loans[0]} onApply={startNewApplication} />}
         {view === 'profile' && user && <Profile user={user} onLogout={logout} />}
         {view === 'admin' && user?.role === 'admin' && <Admin />}
-        {user && ((['dashboard', 'apply', 'result'].includes(view) && user.role !== 'user') || (view === 'admin' && user.role !== 'admin')) && <AccessDenied user={user} />}
+        {view === 'model-insights' && user?.role === 'admin' && <ModelInsights />}
+        {user && ((['dashboard', 'apply', 'result'].includes(view) && user.role !== 'user') || (['admin', 'model-insights'].includes(view) && user.role !== 'admin')) && <AccessDenied user={user} />}
       </main>
 
       {user?.role === 'user' && <Chatbot />}
@@ -178,7 +226,7 @@ function Landing({ onStart }) {
     <section className="landing">
       <div className="hero-copy">
         <span className="eyebrow"><BadgeCheck size={16} /> AI banking decision engine</span>
-        <h1>Smart AI Loan Approval System</h1>
+        <h1>Loan Approval Prediction System</h1>
         <p>Approve smarter, explain faster, and give customers a premium lending experience from secure email login to AI-backed decisions.</p>
         <div className="hero-actions">
           <button className="primary-btn" onClick={onStart}>Get Started <ArrowRight size={18} /></button>
@@ -385,19 +433,20 @@ function HistoryTable({ loans }) {
   );
 }
 
-function LoanForm({ onResult }) {
+function LoanForm({ onResult, resetToken }) {
   const presetTenureYears = ['1', '2', '3', '5', '10'];
-  const [form, setForm] = useState({
+  const defaultForm = {
     income: '',
     credit_score: '',
-    employment_status: 'salaried',
+    employment_status: '',
     loan_amount: '',
     existing_loans: '',
-    loan_type: 'Personal Loan',
-    previous_loan: 'No',
+    loan_type: '',
+    previous_loan: '',
     previous_loan_amount: '',
-    loan_tenure: '24',
-  });
+    loan_tenure: '',
+  };
+  const [form, setForm] = useState(defaultForm);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [scenario, setScenario] = useState(null);
@@ -405,7 +454,23 @@ function LoanForm({ onResult }) {
   const [simulating, setSimulating] = useState(false);
   const [tenureMode, setTenureMode] = useState('list');
   const [customTenureYears, setCustomTenureYears] = useState('');
-  const [selectedTenureYears, setSelectedTenureYears] = useState('2');
+  const [selectedTenureYears, setSelectedTenureYears] = useState('');
+
+  function resetForm() {
+    setForm(defaultForm);
+    setError('');
+    setLoading(false);
+    setScenario(null);
+    setScenarioError('');
+    setSimulating(false);
+    setTenureMode('list');
+    setCustomTenureYears('');
+    setSelectedTenureYears('');
+  }
+
+  useEffect(() => {
+    resetForm();
+  }, [resetToken]);
 
   function update(key, value) {
     setForm((current) => {
@@ -423,6 +488,8 @@ function LoanForm({ onResult }) {
     if (value === 'other') {
       setTenureMode('custom');
       setError('');
+      setSelectedTenureYears('');
+      update('loan_tenure', '');
       return;
     }
 
@@ -516,7 +583,7 @@ function LoanForm({ onResult }) {
     setLoading(true);
     try {
       const data = await api('/api/predict', { method: 'POST', body: JSON.stringify(payload) });
-      onResult(data);
+      onResult(data, payload);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -565,7 +632,8 @@ function LoanForm({ onResult }) {
         <Field label="Monthly income (₹)" value={form.income} onChange={(value) => update('income', value)} placeholder="65000" />
         <Field label="Credit score" value={form.credit_score} onChange={(value) => update('credit_score', value)} placeholder="720" />
         <label>Employment status</label>
-        <select value={form.employment_status} onChange={(event) => update('employment_status', event.target.value)}>
+        <select value={form.employment_status} onChange={(event) => update('employment_status', event.target.value)} required>
+          <option value="" disabled>Select employment status</option>
           <option value="salaried">Salaried</option>
           <option value="self-employed">Self-employed</option>
           <option value="business">Business</option>
@@ -576,7 +644,8 @@ function LoanForm({ onResult }) {
         <Field label="Existing EMIs / loans outstanding (₹)" value={form.existing_loans} onChange={(value) => update('existing_loans', value)} placeholder="15000" />
         
         <label>Loan type</label>
-        <select value={form.loan_type} onChange={(event) => update('loan_type', event.target.value)}>
+        <select value={form.loan_type} onChange={(event) => update('loan_type', event.target.value)} required>
+          <option value="" disabled>Select loan type</option>
           <option value="Personal Loan">Personal Loan</option>
           <option value="Home Loan">Home Loan</option>
           <option value="Vehicle Loan">Vehicle Loan</option>
@@ -584,7 +653,8 @@ function LoanForm({ onResult }) {
         </select>
         
         <label>Do you have any previous loan?</label>
-        <select value={form.previous_loan} onChange={(event) => update('previous_loan', event.target.value)}>
+        <select value={form.previous_loan} onChange={(event) => update('previous_loan', event.target.value)} required>
+          <option value="" disabled>Select an option</option>
           <option value="No">No</option>
           <option value="Yes">Yes</option>
         </select>
@@ -600,7 +670,9 @@ function LoanForm({ onResult }) {
               <select
                 value={selectedTenureYears}
                 onChange={(event) => selectTenure(event.target.value)}
+                required
               >
+                <option value="" disabled>Select tenure in years</option>
                 {presetTenureYears.map((years) => (
                   <option key={years} value={years}>{years} {years === '1' ? 'year' : 'years'}</option>
                 ))}
@@ -757,7 +829,12 @@ function Profile({ user, onLogout }) {
 function Chatbot() {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState([{ from: 'bot', text: 'Hi, I can explain your latest loan decision.' }]);
+  const [messages, setMessages] = useState([
+    {
+      from: 'bot',
+      text: 'Hi, I am your live loan assistant. Ask me about loans, banking, EMI, DTI, credit score, interest rates, or your latest application.',
+    },
+  ]);
   const [loading, setLoading] = useState(false);
 
   async function send(quickMessage = '') {
@@ -783,7 +860,7 @@ function Chatbot() {
           <div className="chat-head"><span><Bot size={18} /> Loan Assistant</span><button onClick={() => setOpen(false)}><X size={18} /></button></div>
           <div className="chat-body">
             <div className="quick-chat">
-              {['Why rejected?', 'Improve score', 'What is risk score?'].map((item) => (
+              {['Why rejected?', 'What is EMI?', 'How to improve eligibility?', 'Home loan vs personal loan'].map((item) => (
                 <button key={item} onClick={() => send(item)}>{item}</button>
               ))}
             </div>
@@ -791,7 +868,7 @@ function Chatbot() {
             {loading && <div className="bubble bot">Typing...</div>}
           </div>
           <div className="chat-input">
-            <input value={message} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && send()} placeholder="Why was my loan rejected?" />
+            <input value={message} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && send()} placeholder="Ask about EMI, DTI, home loans, credit score..." />
             <button onClick={send}><ArrowRight size={18} /></button>
           </div>
         </div>
@@ -872,6 +949,96 @@ function Admin() {
             {stats.duplicate_users.length === 0 && <p className="muted">No duplicate email accounts detected.</p>}
             {stats.duplicate_users.map((item) => <div className="fraud-row" key={item.email}><strong>{item.email}</strong><span>{item.count} accounts</span></div>)}
           </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function InsightMetricCard({ icon: Icon, label, value, tone }) {
+  return (
+    <article className={`stat-card ${tone || ''}`}>
+      <Icon size={20} />
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </article>
+  );
+}
+
+function ModelInsights() {
+  const [insights, setInsights] = useState(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    api('/api/model-insights')
+      .then(setInsights)
+      .catch((err) => setError(err.message));
+  }, []);
+
+  if (error) {
+    return (
+      <section className="panel empty-state">
+        <h2>Model Performance &amp; Evaluation</h2>
+        <p>{error}</p>
+      </section>
+    );
+  }
+
+  if (!insights) {
+    return <section className="panel empty-state"><span className="spinner" /></section>;
+  }
+
+  const matrix = Array.isArray(insights.confusion_matrix) ? insights.confusion_matrix : [];
+  const summaryCards = [
+    [BarChart3, 'Accuracy', formatPercent((insights.accuracy || 0) * 100), 'green'],
+    [ShieldCheck, 'F1 Score', formatPercent((insights.f1_score || 0) * 100), 'amber'],
+    [TrendingUp, 'ROC AUC', formatPercent((insights.roc_auc || 0) * 100), ''],
+    [PieChart, 'Precision', formatPercent((insights.precision || 0) * 100), ''],
+    [CheckCircle2, 'Recall', formatPercent((insights.recall || 0) * 100), ''],
+  ];
+
+  return (
+    <section className="dashboard">
+      <div className="section-head">
+        <div>
+          <span className="eyebrow"><BarChart3 size={16} /> Admin insights</span>
+          <h2>Model Performance &amp; Evaluation</h2>
+        </div>
+      </div>
+
+      <div className="stat-grid">
+        {summaryCards.map(([Icon, label, value, tone]) => (
+          <InsightMetricCard key={label} icon={Icon} label={label} value={value} tone={tone} />
+        ))}
+      </div>
+
+      <div className="analytics-grid">
+        <div className="panel insights-panel">
+          <h3>Confusion Matrix</h3>
+          {insights.image_url ? (
+            <img className="insights-image" src={resolveAssetUrl(insights.image_url)} alt="Confusion matrix heatmap" />
+          ) : (
+            <p className="muted">Confusion matrix image is not available yet.</p>
+          )}
+        </div>
+
+        <div className="panel insights-panel">
+          <h3>Confusion Matrix Values</h3>
+          {matrix.length ? (
+            <div className="matrix-grid">
+              {matrix.flatMap((row, rowIndex) =>
+                row.map((value, columnIndex) => (
+                  <div className="matrix-cell" key={`${rowIndex}-${columnIndex}`}>
+                    <span>{rowIndex === 0 ? 'Actual Rejected' : 'Actual Approved'}</span>
+                    <strong>{value}</strong>
+                    <small>{columnIndex === 0 ? 'Predicted Rejected' : 'Predicted Approved'}</small>
+                  </div>
+                ))
+              )}
+            </div>
+          ) : (
+            <p className="muted">Confusion matrix values are not available yet.</p>
+          )}
         </div>
       </div>
     </section>
