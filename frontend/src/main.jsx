@@ -436,9 +436,21 @@ function HistoryTable({ loans }) {
 function LoanForm({ onResult, resetToken }) {
   const presetTenureYears = ['1', '2', '3', '5', '10'];
   const defaultForm = {
+    age: '',
     income: '',
     credit_score: '',
     employment_status: '',
+    student_earning: '',
+    income_source: '',
+    parent_guardian_income: '',
+    sponsor_available: '',
+    source_of_income: '',
+    savings_amount: '',
+    co_applicant_available: '',
+    company_name: '',
+    work_experience: '',
+    business_type: '',
+    years_in_business: '',
     loan_amount: '',
     existing_loans: '',
     loan_type: '',
@@ -455,6 +467,8 @@ function LoanForm({ onResult, resetToken }) {
   const [tenureMode, setTenureMode] = useState('list');
   const [customTenureYears, setCustomTenureYears] = useState('');
   const [selectedTenureYears, setSelectedTenureYears] = useState('');
+  const ageValue = Number(form.age);
+  const ageError = form.age && (ageValue < 20 || ageValue > 55) ? 'Age limit should be in the 20-55 range.' : '';
 
   function resetForm() {
     setForm(defaultForm);
@@ -478,6 +492,28 @@ function LoanForm({ onResult, resetToken }) {
 
       if (key === 'previous_loan' && value === 'No') {
         newForm.previous_loan_amount = '';
+      }
+      if (key === 'employment_status') {
+        Object.assign(newForm, {
+          income: '',
+          student_earning: '',
+          income_source: '',
+          parent_guardian_income: '',
+          sponsor_available: '',
+          source_of_income: '',
+          savings_amount: '',
+          co_applicant_available: '',
+          company_name: '',
+          work_experience: '',
+          business_type: '',
+          years_in_business: '',
+        });
+      }
+      if (key === 'student_earning') {
+        newForm.income = '';
+        newForm.income_source = '';
+        newForm.parent_guardian_income = '';
+        newForm.sponsor_available = '';
       }
 
       return newForm;
@@ -519,8 +555,37 @@ function LoanForm({ onResult, resetToken }) {
   }
 
   function buildPayload(strict = false) {
-    const required = ['income', 'credit_score', 'loan_amount', 'loan_type', 'employment_status', 'previous_loan'];
+    const required = ['age', 'credit_score', 'loan_amount', 'loan_type', 'employment_status', 'previous_loan'];
     if (required.some((field) => !String(form[field] ?? '').trim())) return null;
+    if (ageError) {
+      if (strict) setError(ageError);
+      return null;
+    }
+
+    const employmentRequired = [];
+    if (form.employment_status === 'student') {
+      employmentRequired.push('student_earning');
+      if (form.student_earning === 'Yes') {
+        employmentRequired.push('income', 'income_source');
+      }
+      if (form.student_earning === 'No') {
+        employmentRequired.push('parent_guardian_income', 'sponsor_available');
+      }
+    } else if (form.employment_status === 'unemployed') {
+      employmentRequired.push('income', 'source_of_income', 'savings_amount', 'co_applicant_available');
+    } else if (form.employment_status === 'salaried') {
+      employmentRequired.push('income', 'company_name', 'work_experience');
+    } else if (['self-employed', 'business'].includes(form.employment_status)) {
+      employmentRequired.push('income', 'business_type', 'years_in_business');
+    }
+
+    const missingEmploymentField = employmentRequired.find((field) => !String(form[field] ?? '').trim());
+    if (missingEmploymentField) {
+      if (strict) {
+        setError('Please complete all employment details before submitting.');
+      }
+      return null;
+    }
 
     let tenureMonths = form.loan_tenure;
     if (tenureMode === 'custom') {
@@ -544,6 +609,7 @@ function LoanForm({ onResult, resetToken }) {
 
     return {
       ...form,
+      income: form.employment_status === 'student' && form.student_earning === 'No' ? '' : form.income,
       existing_loans: form.existing_loans || '0',
       loan_tenure: tenureMonths,
     };
@@ -629,7 +695,8 @@ function LoanForm({ onResult, resetToken }) {
         </div>
       </div>
       <form className="loan-form" onSubmit={submit}>
-        <Field label="Monthly income (₹)" value={form.income} onChange={(value) => update('income', value)} placeholder="65000" />
+        <Field label="Age" value={form.age} onChange={(value) => update('age', value)} placeholder="28" min="0" />
+        {ageError && <div className="field-error">{ageError}</div>}
         <Field label="Credit score" value={form.credit_score} onChange={(value) => update('credit_score', value)} placeholder="720" />
         <label>Employment status</label>
         <select value={form.employment_status} onChange={(event) => update('employment_status', event.target.value)} required>
@@ -640,6 +707,71 @@ function LoanForm({ onResult, resetToken }) {
           <option value="student">Student</option>
           <option value="unemployed">Unemployed</option>
         </select>
+
+        {form.employment_status === 'student' && (
+          <div className="conditional-fields">
+            <label>Are you earning?</label>
+            <select value={form.student_earning} onChange={(event) => update('student_earning', event.target.value)} required>
+              <option value="" disabled>Select an option</option>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+            {form.student_earning === 'Yes' && (
+              <>
+                <Field label="Monthly income (₹)" value={form.income} onChange={(value) => update('income', value)} placeholder="18000" />
+                <label>Income source</label>
+                <select value={form.income_source} onChange={(event) => update('income_source', event.target.value)} required>
+                  <option value="" disabled>Select income source</option>
+                  <option value="Internship">Internship</option>
+                  <option value="Freelancing">Freelancing</option>
+                  <option value="Part-time">Part-time</option>
+                </select>
+              </>
+            )}
+            {form.student_earning === 'No' && (
+              <>
+                <Field label="Parent/Guardian income (₹)" value={form.parent_guardian_income} onChange={(value) => update('parent_guardian_income', value)} placeholder="65000" />
+                <label>Sponsor available?</label>
+                <select value={form.sponsor_available} onChange={(event) => update('sponsor_available', event.target.value)} required>
+                  <option value="" disabled>Select an option</option>
+                  <option value="Yes">Yes</option>
+                  <option value="No">No</option>
+                </select>
+              </>
+            )}
+          </div>
+        )}
+
+        {form.employment_status === 'unemployed' && (
+          <div className="conditional-fields">
+            <Field label="Declared monthly income (₹)" value={form.income} onChange={(value) => update('income', value)} placeholder="25000" />
+            <TextField label="Source of income" value={form.source_of_income} onChange={(value) => update('source_of_income', value)} placeholder="Rent, investments, family support" />
+            <Field label="Savings amount (₹)" value={form.savings_amount} onChange={(value) => update('savings_amount', value)} placeholder="150000" />
+            <label>Co-applicant available?</label>
+            <select value={form.co_applicant_available} onChange={(event) => update('co_applicant_available', event.target.value)} required>
+              <option value="" disabled>Select an option</option>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+        )}
+
+        {form.employment_status === 'salaried' && (
+          <div className="conditional-fields">
+            <Field label="Monthly income (₹)" value={form.income} onChange={(value) => update('income', value)} placeholder="65000" />
+            <TextField label="Company name" value={form.company_name} onChange={(value) => update('company_name', value)} placeholder="Company name" />
+            <Field label="Work experience (years)" value={form.work_experience} onChange={(value) => update('work_experience', value)} placeholder="3" />
+          </div>
+        )}
+
+        {['self-employed', 'business'].includes(form.employment_status) && (
+          <div className="conditional-fields">
+            <Field label="Monthly income (₹)" value={form.income} onChange={(value) => update('income', value)} placeholder="85000" />
+            <TextField label="Business type" value={form.business_type} onChange={(value) => update('business_type', value)} placeholder="Retail, consulting, services" />
+            <Field label="Years in business" value={form.years_in_business} onChange={(value) => update('years_in_business', value)} placeholder="4" />
+          </div>
+        )}
+
         <Field label="Loan amount (₹)" value={form.loan_amount} onChange={(value) => update('loan_amount', value)} placeholder="350000" />
         <Field label="Existing EMIs / loans outstanding (₹)" value={form.existing_loans} onChange={(value) => update('existing_loans', value)} placeholder="15000" />
         
@@ -705,11 +837,20 @@ function LoanForm({ onResult, resetToken }) {
   );
 }
 
-function Field({ label, value, onChange, placeholder }) {
+function Field({ label, value, onChange, placeholder, min = '0' }) {
   return (
     <>
       <label>{label}</label>
-      <input type="number" min="0" value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} required />
+      <input type="number" min={min} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} required />
+    </>
+  );
+}
+
+function TextField({ label, value, onChange, placeholder }) {
+  return (
+    <>
+      <label>{label}</label>
+      <input type="text" value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} required />
     </>
   );
 }
@@ -760,6 +901,8 @@ function Result({ result, onApply }) {
       </div>
       <div className="panel">
         <h3>Decision explanation</h3>
+        {result.warning_message && <div className="warning-banner">{result.warning_message}</div>}
+        {result.underwriting?.manual_review && <div className="review-banner">Manual review required before final approval.</div>}
         <ul className="clean-list">{result.reasons.map((item) => <li key={item}><BarChart3 size={16} /> {item}</li>)}</ul>
       </div>
       <div className="panel">

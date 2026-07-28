@@ -22,6 +22,7 @@ from risk_engine import (
     normalize_previous_loan,
     tenure_years,
 )
+from underwriting_rules import evaluate_underwriting_rules, validate_employment_profile
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "loan.db"
@@ -449,12 +450,12 @@ CHAT_QUICK_GUIDE = (
 
 
 def validate_prediction_input(data):
-    required = ["income", "credit_score", "employment_status", "loan_amount", "loan_type", "previous_loan", "loan_tenure"]
+    required = ["age", "credit_score", "employment_status", "loan_amount", "loan_type", "previous_loan", "loan_tenure"]
     missing = [field for field in required if data.get(field) in (None, "")]
     if missing:
         raise ValueError(f"Missing fields: {', '.join(missing)}")
 
-    income = float(data["income"])
+    age = int(float(data["age"]))
     credit_score = int(data["credit_score"])
     loan_amount = float(data["loan_amount"])
     existing_loans = float(data.get("existing_loans") or 0)
@@ -463,7 +464,20 @@ def validate_prediction_input(data):
     previous_loan_amount = float(data.get("previous_loan_amount") or 0)
     employment_status = normalize_employment_status(data.get("employment_status"))
     loan_type = normalize_loan_type(data.get("loan_type"))
+    employment_profile = validate_employment_profile(data, employment_status)
+    reported_income = float(data.get("income") or 0)
+    income_was_derived = False
 
+    if employment_status == "student" and employment_profile.get("student_earning") == "No":
+        income = float(employment_profile.get("parent_guardian_income") or 0)
+        income_was_derived = True
+    else:
+        if data.get("income") in (None, ""):
+            raise ValueError("Missing fields: income")
+        income = reported_income
+
+    if not 20 <= age <= 55:
+        raise ValueError("Age limit should be in the 20-55 range.")
     if income <= 0 or loan_amount <= 0:
         raise ValueError("Income and loan amount must be greater than zero.")
     if not 300 <= credit_score <= 900:
@@ -480,9 +494,13 @@ def validate_prediction_input(data):
         raise ValueError("Please enter your previous loan amount.")
 
     return {
+        "age": age,
         "income": income,
+        "reported_income": reported_income,
+        "income_was_derived": income_was_derived,
         "credit_score": credit_score,
         "employment_status": employment_status,
+        "employment_profile": employment_profile,
         "loan_amount": loan_amount,
         "existing_loans": existing_loans,
         "loan_type": loan_type,
@@ -504,9 +522,9 @@ def pre_model_policy_validation(features):
     if existing_loans > income:
         reasons.append("Existing EMI obligations are higher than monthly income")
         suggestions.append("Reduce current EMI burden before applying for additional credit.")
-    if monthly_emi > income * 0.55:
-        reasons.append("Projected EMI is above 55% of monthly income")
-        suggestions.append("Choose a longer tenure or lower loan amount to bring EMI below 55% of income.")
+    if monthly_emi > income * 0.5:
+        reasons.append("EMI to income ratio is above 50%")
+        suggestions.append("Choose a longer tenure or lower loan amount to bring EMI below 50% of income.")
     if loan_amount >= 1500000 and loan_tenure <= 24:
         reasons.append("Loan tenure is too short for the requested large loan amount")
         suggestions.append("Use a longer tenure for large-ticket borrowing so affordability stays realistic.")
@@ -865,6 +883,7 @@ def prediction_payload(data):
     ensure_model_ready()
     validated = validate_prediction_input(data)
     features = engineer_features(validated)
+    features["age"] = validated["age"]
     validation_reasons, validation_suggestions = pre_model_policy_validation(features)
 
     if validation_reasons:
@@ -884,6 +903,13 @@ def prediction_payload(data):
             "fraud_flag": bool(fraud_messages),
             "warning_message": fraud_messages[0] if fraud_messages else "Application failed affordability validation before model scoring.",
             "inputs": features,
+            "underwriting": {
+                "penalty_points": 0,
+                "review_reasons": [],
+                "warnings": [],
+                "inconsistencies": [],
+                "manual_review": False,
+            },
             "calculated_emi": features["monthly_emi"],
             "interest_rate": features["interest_rate"],
             "metrics": {
@@ -900,9 +926,13 @@ def prediction_payload(data):
     log_prediction_inputs(ordered_payload, row)
     model_probability = float(MODEL.predict_proba(row)[0][APPROVED_CLASS_INDEX])
     probability, affordability_prob = stabilized_probability(features, model_probability)
-    status = underwriting_decision_tier(features)
+    rules = evaluate_underwriting_rules(validated, features, probability)
+    probability = float(rules["adjusted_probability"])
+    status = rules["final_status"]
+    if status == "Approved" and underwriting_decision_tier(features) != "Approved":
+        status = underwriting_decision_tier(features)
     confidence_score = model_confidence(row, model_probability)
-    raw_risk_score = round((1 - probability) * 100, 1)
+    raw_risk_score = round(((1 - probability) * 100) + rules["risk_penalty_points"], 1)
     if status == "Approved":
         risk_score = min(raw_risk_score, 39.0)
     elif status == "Risky":
@@ -910,6 +940,11 @@ def prediction_payload(data):
     else:
         risk_score = max(raw_risk_score, 70.0)
     reasons, suggestions, top_factors = explain_decision(features, probability, status)
+    if status == "Approved":
+        reasons = rules["positive_reasons"] + reasons
+    else:
+        reasons = rules["negative_reasons"] + rules["review_reasons"] + reasons
+    suggestions = rules["suggestions"] + suggestions
     fraud_messages = fraud_flags(features)
     app.logger.info(
         "Prediction probabilities: model=%s affordability=%s stabilized=%s final_status=%s",
@@ -935,7 +970,14 @@ def prediction_payload(data):
         "top_factors": top_factors,
         "fraud_flags": fraud_messages,
         "fraud_flag": bool(fraud_messages),
-        "warning_message": fraud_messages[0] if fraud_messages else "",
+        "warning_message": (rules["warnings"] or fraud_messages or [""])[0],
+        "underwriting": {
+            "penalty_points": rules["penalty_points"],
+            "review_reasons": rules["review_reasons"],
+            "warnings": rules["warnings"],
+            "inconsistencies": rules["inconsistencies"],
+            "manual_review": rules["manual_review"],
+        },
         "inputs": features,
         "calculated_emi": features["monthly_emi"],
         "interest_rate": features["interest_rate"],
@@ -1202,8 +1244,8 @@ def get_suggestions():
         return jsonify({"error": str(exc)}), 500
     
     current_approval = current_result["approval_probability"]
-    income = float(data.get("income", 0))
-    loan_amount = float(data.get("loan_amount", 0))
+    income = float(current_result["inputs"]["income"])
+    loan_amount = float(current_result["inputs"]["loan_amount"])
     loan_tenure = int(parse_input_loan_tenure(data.get("loan_tenure", 0)))
     existing_loans = float(data.get("existing_loans", 0))
     
