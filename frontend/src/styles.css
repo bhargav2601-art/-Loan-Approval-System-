@@ -1740,3 +1740,298 @@ select.field-invalid:focus {
   color: #991b1b;
   border: 1px solid #f87171;
 }
+
+/* ═══════════════════════════════════════════════
+   CONFIDENCE BAR
+═══════════════════════════════════════════════ */
+.confidence-bar-wrap {
+  margin-top: 14px;
+  width: 100%;
+}
+.confidence-bar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+  margin-bottom: 6px;
+  color: #94a3b8;
+}
+.confidence-bar-header strong { font-size: 0.9rem; }
+.confidence-track {
+  height: 8px;
+  background: #1e293b;
+  border-radius: 99px;
+  overflow: hidden;
+}
+.confidence-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.6s ease;
+}
+.confidence-label {
+  display: block;
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-top: 5px;
+}
+
+/* ═══════════════════════════════════════════════
+   RATIO BARS (Financial Health)
+═══════════════════════════════════════════════ */
+.ratio-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.ratio-row {}
+.ratio-row-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  margin-bottom: 4px;
+  color: #94a3b8;
+}
+.ratio-val.green { color: #4ade80; }
+.ratio-val.amber { color: #fbbf24; }
+.ratio-val.red   { color: #f87171; }
+.ratio-track {
+  height: 6px;
+  background: #1e293b;
+  border-radius: 99px;
+  overflow: hidden;
+}
+.ratio-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.5s ease;
+}
+.ratio-fill.green { background: #16a34a; }
+.ratio-fill.amber { background: #f59e0b; }
+.ratio-fill.red   { background: #ef4444; }
+
+/* ═══════════════════════════════════════════════
+   AFFORDABILITY SCORE BADGE
+═══════════════════════════════════════════════ */
+.afford-score-badge {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+.afford-score-badge strong { font-size: 1.15rem; }
+.green-text { color: #4ade80; }
+.amber-text { color: #fbbf24; }
+.red-text   { color: #f87171; }
+
+/* ═══════════════════════════════════════════════
+   SCORE BREAKDOWN
+═══════════════════════════════════════════════ */
+.breakdown-row {
+  display: grid;
+  grid-template-columns: 140px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: 0.83rem;
+  color: #94a3b8;
+}
+.breakdown-row strong { color: #e2e8f0; font-size: 0.82rem; white-space: nowrap; }
+.breakdown-track {
+  height: 7px;
+  background: #1e293b;
+  border-radius: 99px;
+  overflow: hidden;
+}
+.breakdown-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #6366f1);
+  border-radius: 99px;
+  transition: width 0.5s ease;
+}
+.breakdown-total {
+  font-size: 0.83rem;
+  color: #64748b;
+  margin-top: 10px;
+  text-align: right;
+}
+.breakdown-total strong { color: #e2e8f0; }
+
+/* ═══════════════════════════════════════════════
+   TRIGGERED RULES
+═══════════════════════════════════════════════ */
+.triggered-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.triggered-item {
+  border-radius: 10px;
+  padding: 10px 13px;
+  border-left: 3px solid transparent;
+}
+.triggered-item p { margin: 4px 0 0; font-size: 0.83rem; line-height: 1.5; }
+.triggered-item-header { margin-bottom: 2px; }
+
+.sev-reject  { background: rgba(239,68,68,.08);  border-color: #ef4444; }
+.sev-review  { background: rgba(245,158,11,.08); border-color: #f59e0b; }
+.sev-warning { background: rgba(99,102,241,.08); border-color: #6366f1; }
+.sev-positive{ background: rgba(22,163,74,.08);  border-color: #16a34a; }
+
+.sev-reject   p { color: #fca5a5; }
+.sev-review   p { color: #fde68a; }
+.sev-warning  p { color: #c7d2fe; }
+.sev-positive p { color: #86efac; }
+
+.triggered-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: 99px;
+}
+.sev-reject  .triggered-badge { background: rgba(239,68,68,.25);  color: #fca5a5; }
+.sev-review  .triggered-badge { background: rgba(245,158,11,.25); color: #fde68a; }
+.sev-warning .triggered-badge { background: rgba(99,102,241,.25); color: #c7d2fe; }
+.sev-positive .triggered-badge{ background: rgba(22,163,74,.25);  color: #86efac; }
+
+/* ═══════════════════════════════════════════════
+   DECISION EXPLANATION SECTIONS
+═══════════════════════════════════════════════ */
+.explain-section { margin-top: 14px; }
+.explain-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 9px;
+  border-radius: 99px;
+  margin-bottom: 8px;
+}
+.explain-label.positive { background: rgba(22,163,74,.15); color: #4ade80; }
+.explain-label.negative { background: rgba(239,68,68,.12); color: #f87171; }
+
+/* ═══════════════════════════════════════════════
+   PROCESSING TIMELINE
+═══════════════════════════════════════════════ */
+.timeline { display: flex; flex-direction: column; gap: 0; margin-top: 8px; }
+.timeline-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 8px 0;
+  position: relative;
+}
+.timeline-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 34px;
+  bottom: -8px;
+  width: 2px;
+  background: #1e293b;
+}
+.timeline-dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2563eb, #6366f1);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  z-index: 1;
+}
+.timeline-content { padding-top: 4px; }
+.timeline-content strong { display: block; font-size: 0.87rem; color: #e2e8f0; margin-bottom: 2px; }
+.timeline-content span  { font-size: 0.78rem; color: #64748b; }
+
+/* ═══════════════════════════════════════════════
+   RECOMMENDATION CARDS
+═══════════════════════════════════════════════ */
+.rec-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+.rec-card {
+  border-radius: 12px;
+  padding: 14px 16px;
+  border: 1px solid transparent;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.rec-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+.rec-card p { margin: 8px 0 0; font-size: 0.81rem; line-height: 1.55; color: #94a3b8; }
+.rec-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.rec-card-header strong { font-size: 0.88rem; color: #e2e8f0; flex: 1; }
+.rec-impact-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: 99px;
+}
+
+.impact-high   { background: rgba(239,68,68,.08);  border-color: #ef4444; }
+.impact-medium { background: rgba(245,158,11,.08); border-color: #f59e0b; }
+.impact-low    { background: rgba(22,163,74,.08);  border-color: #16a34a; }
+
+.impact-high   .rec-card-header { color: #f87171; }
+.impact-medium .rec-card-header { color: #fbbf24; }
+.impact-low    .rec-card-header { color: #4ade80; }
+
+.impact-high   .rec-impact-badge { background: rgba(239,68,68,.2);  color: #fca5a5; }
+.impact-medium .rec-impact-badge { background: rgba(245,158,11,.2); color: #fde68a; }
+.impact-low    .rec-impact-badge { background: rgba(22,163,74,.2);  color: #86efac; }
+
+/* ═══════════════════════════════════════════════
+   FINANCIAL HEALTH BARS (Dashboard)
+═══════════════════════════════════════════════ */
+.fin-health-grid { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; }
+.fin-health-bar {}
+.fin-health-bar-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  color: #94a3b8;
+  margin-bottom: 5px;
+}
+.fin-health-bar-header strong { color: #e2e8f0; }
+.fin-health-track {
+  height: 8px;
+  background: #1e293b;
+  border-radius: 99px;
+  overflow: hidden;
+}
+.fin-health-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.6s ease;
+}
+.fin-health-fill.green { background: #16a34a; }
+.fin-health-fill.amber { background: #f59e0b; }
+.fin-health-fill.red   { background: #ef4444; }
+.fin-health-fill.blue  { background: #2563eb; }
+
+/* ═══════════════════════════════════════════════
+   HISTORY TABLE — 6-column upgrade
+═══════════════════════════════════════════════ */
+.admin-row.user-history {
+  grid-template-columns: 90px 1fr 90px 90px 55px 80px !important;
+}
+
+/* risk-card — remove fixed metric grid, use flexible layout */
+.risk-card { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.risk-card strong { font-size: 0.9rem; color: #94a3b8; text-align: center; }
+

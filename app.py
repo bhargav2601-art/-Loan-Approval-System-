@@ -891,7 +891,102 @@ def stabilized_probability(features, model_probability):
     return round(float(blended), 6), round(affordability, 6)
 
 
+def _build_triggered_rules(rules: dict) -> list[dict]:
+    """Build a structured list of triggered underwriting rules for display."""
+    triggered = []
+    severity_order = {"reject": 0, "review": 1, "warning": 2, "positive": 3}
+
+    for reason in rules.get("negative_reasons", []):
+        triggered.append({"rule": reason, "severity": "reject", "label": "Hard Reject Rule"})
+    for reason in rules.get("review_reasons", []):
+        triggered.append({"rule": reason, "severity": "review", "label": "Manual Review"})
+    for reason in rules.get("inconsistencies", []):
+        if not any(t["rule"] == reason for t in triggered):
+            triggered.append({"rule": reason, "severity": "review", "label": "Consistency Flag"})
+    for reason in rules.get("risk_factors", []):
+        triggered.append({"rule": reason, "severity": "warning", "label": "Risk Factor"})
+    for reason in rules.get("positive_reasons", []):
+        triggered.append({"rule": reason, "severity": "positive", "label": "Positive Signal"})
+
+    triggered.sort(key=lambda x: severity_order.get(x["severity"], 9))
+    return triggered[:10]
+
+
+def _build_recommendations(rules: dict, features: dict) -> list[dict]:
+    """Generate prioritised, actionable recommendations from underwriting output."""
+    recs = []
+    ratios = rules.get("financial_ratios", {})
+    income = float(features.get("income") or 1)
+    loan_amount = float(features.get("loan_amount") or 0)
+    emi = float(features.get("monthly_emi") or 0)
+    credit = int(features.get("credit_score") or 0)
+    existing = float(features.get("existing_loans") or 0)
+    dti = ratios.get("debt_to_income", 0)
+    emi_ratio = ratios.get("emi_ratio", 0)
+    affordability = ratios.get("affordability_score", 100)
+
+    if emi_ratio > 0.4:
+        reduced = round(income * 0.35 / (emi / max(loan_amount, 1)), -3) if emi > 0 else loan_amount
+        recs.append({
+            "title": "Reduce Loan Amount",
+            "description": f"Your EMI is {emi_ratio*100:.0f}% of income. Reducing the loan to ≈₹{int(reduced):,} would bring EMI below 35%.",
+            "impact": "High",
+            "icon": "arrow-down",
+        })
+
+    if credit < 700:
+        recs.append({
+            "title": "Improve Credit Score",
+            "description": f"Your score ({credit}) is below the preferred 700+. Paying dues on time for 3–6 months can improve approval chances significantly.",
+            "impact": "High",
+            "icon": "trending-up",
+        })
+
+    if dti > 0.45:
+        recs.append({
+            "title": "Reduce Existing Loans",
+            "description": f"Current debt obligations consume {dti*100:.0f}% of income. Clearing ₹{int(existing*0.3):,} of existing EMIs would improve your debt profile.",
+            "impact": "High",
+            "icon": "minus-circle",
+        })
+
+    if emi_ratio > 0.30:
+        recs.append({
+            "title": "Increase Loan Tenure",
+            "description": "Extending your loan tenure reduces monthly EMI and improves the EMI-to-income ratio, making repayment more comfortable.",
+            "impact": "Medium",
+            "icon": "calendar",
+        })
+
+    if affordability < 50:
+        recs.append({
+            "title": "Add a Co-Applicant",
+            "description": "Adding a co-applicant with stable income significantly improves your debt-to-income ratio and overall affordability score.",
+            "impact": "High",
+            "icon": "user-plus",
+        })
+
+    if ratios.get("savings_ratio", 1) < 0.10:
+        recs.append({
+            "title": "Build Savings",
+            "description": "Maintaining savings of at least 10–20% of the loan amount demonstrates financial discipline and reduces perceived risk.",
+            "impact": "Medium",
+            "icon": "piggy-bank",
+        })
+
+    if not recs:
+        recs.append({
+            "title": "Maintain Your Profile",
+            "description": "Your financial profile is strong. Continue maintaining your credit score and keeping debt obligations low.",
+            "impact": "Low",
+            "icon": "shield-check",
+        })
+
+    return recs[:5]
+
+
 def prediction_payload(data):
+
     ensure_model_ready()
     validated = validate_prediction_input(data)
     features = engineer_features(validated)
@@ -983,13 +1078,19 @@ def prediction_payload(data):
         "warning_message": (rules["warnings"] or fraud_messages or [""])[0],
         "underwriting": {
             "penalty_points": rules["rule_points"],
+            "financial_points": rules.get("financial_points", 0),
             "consistency_points": rules["consistency_points"],
+            "stability_points": rules.get("stability_points", 0),
             "review_reasons": rules["review_reasons"],
             "warnings": rules["warnings"],
             "inconsistencies": rules["inconsistencies"],
             "manual_review": rules["manual_review"],
             "financial_ratios": rules["financial_ratios"],
             "field_feedback": rules["field_feedback"],
+            "positive_reasons": rules["positive_reasons"],
+            "risk_factors": rules["risk_factors"],
+            "triggered_rules": _build_triggered_rules(rules),
+            "recommendations": _build_recommendations(rules, features),
         },
         "inputs": features,
         "calculated_emi": features["monthly_emi"],
@@ -1559,17 +1660,34 @@ def admin_stats():
         {"factor": "Unstable employment", "count": sum(1 for item in loans if item["employment_status"] in {"student", "unemployed"})},
     ]
 
+    manual_reviews = sum(1 for item in loans if item["status"] in {"Manual Review", "Risky"})
+    approval_rate = round(approved / len(loans) * 100, 1) if loans else 0
+    emp_counts: dict[str, int] = {}
+    for item in loans:
+        emp = item.get("employment_status", "unknown").capitalize()
+        emp_counts[emp] = emp_counts.get(emp, 0) + 1
+    employment_distribution = [{
+        "status": k,
+        "count": v,
+        "approved": sum(1 for item in loans if item.get("employment_status", "").capitalize() == k and item["status"] == "Approved"),
+    } for k, v in sorted(emp_counts.items(), key=lambda x: -x[1])]
+    avg_dti = round(sum(item["metrics"]["dti_ratio"] for item in loans) / len(loans), 1) if loans else 0
+
     return jsonify({
         "total_users": total_users,
         "total_applications": len(loans),
         "approved": approved,
         "risky": risky,
         "rejected": rejected,
+        "manual_reviews": manual_reviews,
+        "approval_rate": approval_rate,
+        "avg_dti": avg_dti,
         "applications": loans,
         "high_risk": high_risk[:8],
         "duplicate_users": [{"email": row["email"], "count": row["count"]} for row in duplicate_rows],
         "income_groups": income_groups,
         "factor_impact": factor_impact,
+        "employment_distribution": employment_distribution,
     })
 
 

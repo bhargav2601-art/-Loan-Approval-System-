@@ -1,14 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
+  Activity,
+  AlertTriangle,
   ArrowRight,
+  Award,
   BadgeCheck,
   BarChart3,
   Bot,
+  Briefcase,
   CheckCircle2,
   ChevronRight,
   CircleDollarSign,
   Clock3,
+  GraduationCap,
+  Heart,
+  Info,
   Landmark,
   LockKeyhole,
   LogOut,
@@ -20,9 +27,12 @@ import {
   ShieldCheck,
   Sparkles,
   Table2,
+  Target,
+  ThumbsUp,
   TrendingUp,
   UserPlus,
   UserRound,
+  Wallet,
   X,
   XCircle,
 } from 'lucide-react';
@@ -360,9 +370,12 @@ function Login({ initialRole = 'user', onAuthed }) {
   );
 }
 function Dashboard({ user, history, onApply }) {
+  const stats = history.stats;
+  const approvalRate = stats.total > 0 ? Math.round((stats.approved / stats.total) * 100) : 0;
+
   const doughnutData = useMemo(() => ({
     labels: ['Approved', 'Risky', 'Rejected'],
-    datasets: [{ data: [history.stats.approved, history.stats.risky, history.stats.rejected], backgroundColor: ['#16a34a', '#f59e0b', '#ef4444'], borderWidth: 0 }],
+    datasets: [{ data: [stats.approved, stats.risky, stats.rejected], backgroundColor: ['#16a34a', '#f59e0b', '#ef4444'], borderWidth: 0 }],
   }), [history]);
 
   const barData = useMemo(() => ({
@@ -379,22 +392,51 @@ function Dashboard({ user, history, onApply }) {
         </div>
         <button className="primary-btn" onClick={onApply}>New Application <ChevronRight size={18} /></button>
       </div>
+
+      {/* KPI Stats */}
       <div className="stat-grid">
-        <Stat icon={CircleDollarSign} label="Applications" value={history.stats.total} />
-        <Stat icon={CheckCircle2} label="Approved" value={history.stats.approved} tone="green" />
-        <Stat icon={ShieldAlert} label="Risky" value={history.stats.risky} tone="amber" />
-        <Stat icon={XCircle} label="Rejected" value={history.stats.rejected} tone="red" />
-        <Stat icon={ShieldCheck} label="Avg Confidence" value={formatPercent(history.stats.avg_confidence)} />
+        <Stat icon={CircleDollarSign} label="Applications" value={stats.total} />
+        <Stat icon={CheckCircle2} label="Approved" value={stats.approved} tone="green" />
+        <Stat icon={ShieldAlert} label="Under Review" value={stats.risky} tone="amber" />
+        <Stat icon={XCircle} label="Rejected" value={stats.rejected} tone="red" />
+        <Stat icon={Target} label="Approval Rate" value={`${approvalRate}%`} tone={approvalRate >= 60 ? 'green' : approvalRate >= 30 ? 'amber' : 'red'} />
+        <Stat icon={ShieldCheck} label="Avg Confidence" value={formatPercent(stats.avg_confidence)} />
       </div>
+
+      {/* Charts */}
       <div className="analytics-grid">
-        <div className="panel"><h3>Approval mix</h3><Doughnut data={doughnutData} options={{ cutout: '72%', plugins: { legend: { position: 'bottom' } } }} /></div>
-        <div className="panel"><h3>Risk trend</h3><Bar data={barData} options={{ responsive: true, scales: { y: { min: 0, max: 100 } } }} /></div>
+        <div className="panel"><h3>Approval distribution</h3><Doughnut data={doughnutData} options={{ cutout: '72%', plugins: { legend: { position: 'bottom' } } }} /></div>
+        <div className="panel"><h3>Risk score trend</h3><Bar data={barData} options={{ responsive: true, scales: { y: { min: 0, max: 100 } } }} /></div>
       </div>
+
+      {/* Financial Health */}
+      {stats.avg_risk !== undefined && (
+        <div className="panel">
+          <h3><Heart size={16} style={{display:'inline',marginRight:6}} />Financial Health Overview</h3>
+          <div className="fin-health-grid">
+            <FinHealthBar label="Avg Risk Score" value={stats.avg_risk} max={100} tone={stats.avg_risk < 35 ? 'green' : stats.avg_risk < 65 ? 'amber' : 'red'} />
+            <FinHealthBar label="Avg Confidence" value={stats.avg_confidence} max={100} tone="blue" />
+            <FinHealthBar label="Approval Rate" value={approvalRate} max={100} tone={approvalRate >= 50 ? 'green' : 'amber'} />
+          </div>
+        </div>
+      )}
+
+      {/* Recent applications */}
       <div className="panel">
-        <h3>Previous loan applications</h3>
+        <h3>Recent applications</h3>
         <HistoryTable loans={history.loans} />
       </div>
     </section>
+  );
+}
+
+function FinHealthBar({ label, value, max = 100, tone = 'blue' }) {
+  const pct = Math.min(100, Math.round((value / max) * 100));
+  return (
+    <div className="fin-health-bar">
+      <div className="fin-health-bar-header"><span>{label}</span><strong>{Math.round(value)}</strong></div>
+      <div className="fin-health-track"><div className={`fin-health-fill ${tone}`} style={{ width: `${pct}%` }} /></div>
+    </div>
   );
 }
 
@@ -417,16 +459,19 @@ function HistoryTable({ loans }) {
   if (loans.length === 0) {
     return <p className="muted">No applications yet. Run your first AI decision.</p>;
   }
-
   return (
     <div className="admin-table">
-      <div className="admin-row user-history header"><span>Date</span><span>Amount</span><span>Status</span><span>Risk score</span></div>
+      <div className="admin-row user-history header">
+        <span>Date</span><span>Amount</span><span>Employment</span><span>Status</span><span>Risk</span><span>Confidence</span>
+      </div>
       {loans.map((loan) => (
         <div className="admin-row user-history" key={loan.id}>
           <span>{new Date(loan.created_at).toLocaleDateString()}</span>
           <span>{currency(loan.loan_amount)}</span>
-          <span className={`status ${loan.status.toLowerCase()}`}>{loan.status}</span>
+          <span style={{textTransform:'capitalize'}}>{loan.employment_status || '—'}</span>
+          <span className={`status ${(loan.status || '').toLowerCase().replace(/\s+/g, '-')}`}>{loan.status}</span>
           <span>{loan.risk_score}/100</span>
+          <span>{formatPercent(loan.confidence_score)}</span>
         </div>
       ))}
     </div>
@@ -991,67 +1036,280 @@ function Metric({ label, value }) {
 }
 
 function RiskMeter({ score }) {
-  const degrees = Math.max(18, Math.min(342, Number(score || 0) * 3.2));
-  return <div className="score-orb dynamic" style={{ background: `conic-gradient(#2563eb 0 ${degrees}deg, #dbeafe ${degrees}deg 360deg)` }}>{Math.round(score || 0)}</div>;
+  const clamped = Math.max(0, Math.min(100, Number(score || 0)));
+  const degrees = Math.round(clamped * 3.2);
+  const color = clamped < 35 ? '#16a34a' : clamped < 65 ? '#f59e0b' : '#ef4444';
+  return (
+    <div className="score-orb dynamic" style={{ background: `conic-gradient(${color} 0 ${degrees}deg, #1e293b ${degrees}deg 360deg)` }}>
+      {Math.round(clamped)}
+    </div>
+  );
 }
 
+function ConfidenceBar({ value }) {
+  const pct = Math.min(100, Math.max(0, Number(value || 0)));
+  const color = pct >= 70 ? '#16a34a' : pct >= 45 ? '#f59e0b' : '#ef4444';
+  return (
+    <div className="confidence-bar-wrap">
+      <div className="confidence-bar-header">
+        <span>Model Confidence</span>
+        <strong style={{ color }}>{pct.toFixed(1)}%</strong>
+      </div>
+      <div className="confidence-track">
+        <div className="confidence-fill" style={{ width: `${pct}%`, background: color }} />
+      </div>
+      <span className="confidence-label">{pct >= 70 ? 'High confidence' : pct >= 45 ? 'Moderate confidence' : 'Low confidence — manual review advised'}</span>
+    </div>
+  );
+}
+
+function RatioBar({ label, value, good, warn, format = 'percent' }) {
+  const display = format === 'percent' ? `${(value * 100).toFixed(1)}%` : value.toFixed(2);
+  const tone = value <= good ? 'green' : value <= warn ? 'amber' : 'red';
+  const pct = Math.min(100, Math.round(value * 100));
+  return (
+    <div className="ratio-row">
+      <div className="ratio-row-header"><span>{label}</span><strong className={`ratio-val ${tone}`}>{display}</strong></div>
+      <div className="ratio-track"><div className={`ratio-fill ${tone}`} style={{ width: `${Math.min(pct, 100)}%` }} /></div>
+    </div>
+  );
+}
+
+const SEVERITY_META = {
+  reject:   { cls: 'sev-reject',   label: 'Reject Rule' },
+  review:   { cls: 'sev-review',   label: 'Review Flag' },
+  warning:  { cls: 'sev-warning',  label: 'Risk Factor' },
+  positive: { cls: 'sev-positive', label: 'Positive' },
+};
+
+const IMPACT_META = {
+  High:   { cls: 'impact-high',   icon: AlertTriangle },
+  Medium: { cls: 'impact-medium', icon: Info },
+  Low:    { cls: 'impact-low',    icon: ThumbsUp },
+};
+
+const TIMELINE_STEPS = [
+  { id: 'collection', label: 'Data Collection', desc: 'Application fields captured and validated' },
+  { id: 'consistency', label: 'Consistency Check', desc: 'Cross-field logical validation' },
+  { id: 'ml', label: 'ML Scoring', desc: 'Random Forest ensemble probability computed' },
+  { id: 'financial', label: 'Financial Ratios', desc: 'DTI, EMI ratio, affordability scored' },
+  { id: 'underwriting', label: 'Underwriting Rules', desc: 'Employment-specific business rules applied' },
+  { id: 'decision', label: 'Final Decision', desc: 'Combined risk score determines outcome' },
+];
+
 function Result({ result, onApply }) {
-  if (!result) return <section className="panel empty-state"><h2>No result yet</h2><button className="primary-btn" onClick={onApply}>Create Application</button></section>;
-  const approved = result.status === 'Approved';
-  const risky = result.status === 'Risky';
-  const toneClass = approved ? 'approved-bg' : risky ? 'risky-bg' : 'rejected-bg';
-  const toneCopy = approved
+  if (!result) return (
+    <section className="panel empty-state">
+      <h2>No result yet</h2>
+      <button className="primary-btn" onClick={onApply}>Create Application</button>
+    </section>
+  );
+
+  const statusKey = (result.status || '').toLowerCase().replace(/\s+/g, '-');
+  const approved  = result.status === 'Approved';
+  const risky     = result.status === 'Risky';
+  const manual    = result.status === 'Manual Review';
+  const rejected  = result.status === 'Rejected';
+
+  const toneClass = approved ? 'approved-bg' : risky || manual ? 'risky-bg' : 'rejected-bg';
+  const toneCopy  = approved
     ? 'This profile clears the AI lending policy.'
-    : risky
-      ? 'This profile is conditionally approvable but needs additional affordability review.'
-      : 'The current profile needs improvement before approval.';
+    : manual
+      ? 'Application requires manual underwriter review before a final decision.'
+      : risky
+        ? 'Profile is conditionally approvable but needs additional review.'
+        : 'The current profile needs improvement before approval.';
+
+  const uw         = result.underwriting || {};
+  const ratios     = uw.financial_ratios || {};
+  const triggered  = uw.triggered_rules || [];
+  const recs       = uw.recommendations || [];
+  const topFactors = result.top_factors || [];
+
+  const scoreBreakdown = [
+    { label: 'Business Rules',    value: uw.penalty_points   || 0 },
+    { label: 'Financial Risk',    value: uw.financial_points  || 0 },
+    { label: 'Consistency Flags', value: uw.consistency_points|| 0 },
+    { label: 'Stability',         value: uw.stability_points  || 0 },
+  ].filter(s => s.value > 0);
+
+  const maxBreakdown = Math.max(...scoreBreakdown.map(s => s.value), 1);
+
   return (
     <section className="result-grid">
+
+      {/* ── Decision Header ── */}
       <div className={`decision-panel ${toneClass}`}>
-        {approved ? <CheckCircle2 size={44} /> : risky ? <ShieldAlert size={44} /> : <XCircle size={44} />}
+        {approved ? <CheckCircle2 size={44} /> : manual ? <ShieldAlert size={44} /> : risky ? <ShieldAlert size={44} /> : <XCircle size={44} />}
         <span>Loan Status</span>
         <h2>{result.status}</h2>
         <p>{toneCopy}</p>
         <div className="metric-grid decision-metrics">
-          <Metric label="EMI" value={currency(result.calculated_emi)} />
-          <Metric label="Rate" value={formatPercent(result.interest_rate)} />
-          <Metric label="Approval" value={formatPercent(result.approval_probability)} />
+          <Metric label="EMI"        value={currency(result.calculated_emi)} />
+          <Metric label="Rate"       value={formatPercent(result.interest_rate)} />
+          <Metric label="Approval"   value={formatPercent(result.approval_probability)} />
           <Metric label="Confidence" value={formatPercent(result.confidence_score)} />
         </div>
       </div>
+
+      {/* ── Risk Meter + Confidence ── */}
       <div className="panel risk-card">
         <h3>Risk Score</h3>
         <RiskMeter score={result.risk_score} />
-        <strong>{result.risk_category} risk</strong>
-        <div className="metric-grid compact">
-          <Metric label="DTI" value={formatPercent(result.metrics.dti_ratio)} />
-          <Metric label="EMI / Income" value={formatPercent(result.metrics.emi_to_income_ratio)} />
-          <Metric label="Utilization" value={formatPercent(result.metrics.credit_utilization)} />
-          <Metric label="Stability" value={formatPercent(result.metrics.income_stability_factor)} />
+        <strong>{result.risk_category}</strong>
+        <ConfidenceBar value={result.confidence_score} />
+      </div>
+
+      {/* ── Financial Health ── */}
+      <div className="panel">
+        <h3><Activity size={15} style={{display:'inline',marginRight:5}} />Financial Health</h3>
+        {ratios.affordability_score !== undefined && (
+          <div className="afford-score-badge">
+            <span>Affordability Score</span>
+            <strong className={ratios.affordability_score >= 70 ? 'green-text' : ratios.affordability_score >= 45 ? 'amber-text' : 'red-text'}>
+              {ratios.affordability_score}/100
+            </strong>
+          </div>
+        )}
+        <div className="ratio-list">
+          {ratios.debt_to_income    !== undefined && <RatioBar label="Debt-to-Income"     value={ratios.debt_to_income}    good={0.35} warn={0.50} />}
+          {ratios.emi_ratio         !== undefined && <RatioBar label="EMI Ratio"          value={ratios.emi_ratio}         good={0.30} warn={0.40} />}
+          {ratios.existing_loan_ratio !== undefined && <RatioBar label="Existing Loan Ratio" value={ratios.existing_loan_ratio} good={0.20} warn={0.35} />}
+          {ratios.savings_ratio     !== undefined && <RatioBar label="Savings Coverage"   value={ratios.savings_ratio}     good={0.20} warn={0.10} format="decimal" />}
+        </div>
+        <div className="metric-grid compact" style={{marginTop:12}}>
+          <Metric label="DTI"         value={formatPercent(result.metrics?.dti_ratio)} />
+          <Metric label="EMI/Income"  value={formatPercent(result.metrics?.emi_to_income_ratio)} />
+          <Metric label="Utilization" value={formatPercent(result.metrics?.credit_utilization)} />
+          <Metric label="Stability"   value={formatPercent(result.metrics?.income_stability_factor)} />
         </div>
       </div>
+
+      {/* ── Approval Breakdown ── */}
+      {scoreBreakdown.length > 0 && (
+        <div className="panel">
+          <h3><BarChart3 size={15} style={{display:'inline',marginRight:5}} />Score Breakdown</h3>
+          <p className="muted" style={{fontSize:'0.82rem',marginBottom:8}}>Lower penalty points = lower risk</p>
+          {scoreBreakdown.map(s => (
+            <div className="breakdown-row" key={s.label}>
+              <span>{s.label}</span>
+              <div className="breakdown-track">
+                <div className="breakdown-fill" style={{ width: `${Math.round(s.value / maxBreakdown * 100)}%` }} />
+              </div>
+              <strong>{s.value}pts</strong>
+            </div>
+          ))}
+          <div className="breakdown-total">Total Risk Score: <strong>{result.risk_score}/100</strong></div>
+        </div>
+      )}
+
+      {/* ── Triggered Rules ── */}
+      {triggered.length > 0 && (
+        <div className="panel">
+          <h3><Target size={15} style={{display:'inline',marginRight:5}} />Triggered Rules</h3>
+          <div className="triggered-list">
+            {triggered.map((t, i) => {
+              const meta = SEVERITY_META[t.severity] || SEVERITY_META.warning;
+              return (
+                <div className={`triggered-item ${meta.cls}`} key={i}>
+                  <div className="triggered-item-header">
+                    <span className="triggered-badge">{meta.label}</span>
+                  </div>
+                  <p>{t.rule}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Explanation ── */}
       <div className="panel">
-        <h3>Decision explanation</h3>
+        <h3>Decision Explanation</h3>
         {result.warning_message && <div className="warning-banner">{result.warning_message}</div>}
-        {result.underwriting?.manual_review && <div className="review-banner">Manual review required before final approval.</div>}
-        <ul className="clean-list">{result.reasons.map((item) => <li key={item}><BarChart3 size={16} /> {item}</li>)}</ul>
+        {uw.manual_review && <div className="review-banner">Manual review required before final approval.</div>}
+        {(uw.positive_reasons?.length > 0) && (
+          <div className="explain-section">
+            <span className="explain-label positive"><ThumbsUp size={13} /> Positive Factors</span>
+            <ul className="clean-list">
+              {uw.positive_reasons.map(item => <li key={item}><CheckCircle2 size={15} /> {item}</li>)}
+            </ul>
+          </div>
+        )}
+        {(uw.risk_factors?.length > 0 || result.reasons?.length > 0) && (
+          <div className="explain-section">
+            <span className="explain-label negative"><AlertTriangle size={13} /> Risk Factors</span>
+            <ul className="clean-list">
+              {[...(uw.risk_factors || []), ...(result.reasons || [])].slice(0,5).map(item => <li key={item}><BarChart3 size={15} /> {item}</li>)}
+            </ul>
+          </div>
+        )}
       </div>
+
+      {/* ── Processing Timeline ── */}
       <div className="panel">
-        <h3>Suggestions</h3>
-        <ul className="clean-list">{result.suggestions.map((item) => <li key={item}><Sparkles size={16} /> {item}</li>)}</ul>
-        <button className="secondary-btn" onClick={onApply}>Try another scenario</button>
-      </div>
-      <div className="panel result-wide">
-        <h3>Top contributing factors</h3>
-        <div className="factor-grid">
-          {result.top_factors.map((factor) => (
-            <div className={`factor-card ${factor.direction}`} key={factor.feature}>
-              <strong>{factor.title}</strong>
-              <span>{factor.suggestion}</span>
+        <h3><Clock3 size={15} style={{display:'inline',marginRight:5}} />Processing Timeline</h3>
+        <div className="timeline">
+          {TIMELINE_STEPS.map((step, i) => (
+            <div className="timeline-step" key={step.id}>
+              <div className="timeline-dot">{i + 1}</div>
+              <div className="timeline-content">
+                <strong>{step.label}</strong>
+                <span>{step.desc}</span>
+              </div>
             </div>
           ))}
         </div>
       </div>
+
+      {/* ── Top Factors ── */}
+      {topFactors.length > 0 && (
+        <div className="panel result-wide">
+          <h3>Top Contributing Factors</h3>
+          <div className="factor-grid">
+            {topFactors.map((factor) => (
+              <div className={`factor-card ${factor.direction}`} key={factor.feature}>
+                <strong>{factor.title}</strong>
+                <span>{factor.suggestion}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Recommendation Cards ── */}
+      {recs.length > 0 && (
+        <div className="panel result-wide">
+          <h3><Sparkles size={15} style={{display:'inline',marginRight:5}} />Recommendations</h3>
+          <div className="rec-grid">
+            {recs.map((rec, i) => {
+              const meta = IMPACT_META[rec.impact] || IMPACT_META.Low;
+              const Icon = meta.icon;
+              return (
+                <div className={`rec-card ${meta.cls}`} key={i}>
+                  <div className="rec-card-header">
+                    <Icon size={18} />
+                    <strong>{rec.title}</strong>
+                    <span className="rec-impact-badge">{rec.impact} Impact</span>
+                  </div>
+                  <p>{rec.description}</p>
+                </div>
+              );
+            })}
+          </div>
+          <button className="secondary-btn" style={{marginTop:16}} onClick={onApply}>Try another scenario</button>
+        </div>
+      )}
+
+      {/* ── Suggestions fallback ── */}
+      {recs.length === 0 && result.suggestions?.length > 0 && (
+        <div className="panel">
+          <h3>Suggestions</h3>
+          <ul className="clean-list">{result.suggestions.map(item => <li key={item}><Sparkles size={16} /> {item}</li>)}</ul>
+          <button className="secondary-btn" onClick={onApply}>Try another scenario</button>
+        </div>
+      )}
+
     </section>
   );
 }
