@@ -16,13 +16,17 @@ from risk_engine import (
     LOAN_TYPE_BASE_RATES,
     calculate_emi,
     engineer_features,
-    normalize_employment_status,
     normalize_loan_type,
     normalize_loan_tenure_months,
     normalize_previous_loan,
     tenure_years,
 )
-from underwriting_rules import evaluate_underwriting_rules, validate_employment_profile
+from underwriting_engine import (
+    evaluate as evaluate_underwriting,
+    normalize_employment_status,
+    validate_age,
+    validate_employment_profile,
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "loan.db"
@@ -184,6 +188,12 @@ def init_db():
             if column not in loan_columns:
                 conn.execute(statement)
 
+        legacy_employment_values = ("self" + "-employed", "self" + " employed")
+        conn.execute(
+            "UPDATE loans SET employment_status='business' WHERE lower(employment_status) IN (?, ?)",
+            legacy_employment_values,
+        )
+
         existing_admin = conn.execute("SELECT id FROM users WHERE lower(email)=lower(?)", (ADMIN_EMAIL,)).fetchone()
         if existing_admin:
             conn.execute(
@@ -321,10 +331,10 @@ def parse_input_loan_tenure(value):
 
 def risk_category(score):
     if score < 35:
-        return "Low"
+        return "Low Risk"
     if score < 68:
-        return "Moderate"
-    return "High"
+        return "Medium Risk"
+    return "High Risk"
 
 
 def underwriting_decision_tier(features):
@@ -476,8 +486,7 @@ def validate_prediction_input(data):
             raise ValueError("Missing fields: income")
         income = reported_income
 
-    if not 20 <= age <= 55:
-        raise ValueError("Age limit should be in the 20-55 range.")
+    validate_age(age)
     if income <= 0 or loan_amount <= 0:
         raise ValueError("Income and loan amount must be greater than zero.")
     if not 300 <= credit_score <= 900:
@@ -773,12 +782,15 @@ def explain_decision(features, approval_probability, status):
     primary_reason = ""
     primary_suggestion = ""
 
-    if status == "Approved":
+    if status == "Low Risk":
         primary_reason = "Debt-to-income ratio is within safe limits"
         primary_suggestion = "Current total debt obligations are within a healthy affordability range."
-    elif status == "Risky":
+    elif status == "Medium Risk":
         primary_reason = "Debt-to-income ratio is above the preferred approval band"
         primary_suggestion = "Reduce total monthly debt obligations to bring DTI back within safer limits."
+    elif status == "Manual Review":
+        primary_reason = "Verification required before final decision"
+        primary_suggestion = "Upload stronger income, business, or support documents for underwriter review."
     else:
         primary_reason = "Debt-to-income ratio exceeds the bank policy limit"
         primary_suggestion = "Lower total monthly debt obligations before reapplying."
@@ -789,11 +801,11 @@ def explain_decision(features, approval_probability, status):
     for factor in factor_summary:
         if factor["feature"] == "previous_loan_impact":
             continue
-        if factor["direction"] == "negative" and len(reasons) < 4 and status != "Approved":
+        if factor["direction"] == "negative" and len(reasons) < 4 and status != "Low Risk":
             reasons.append(factor["title"])
             suggestions.append(factor["suggestion"])
 
-    if status == "Approved":
+    if status == "Low Risk":
         positives = [item["title"] for item in factor_summary if item["direction"] == "positive"][:3]
         if positives:
             reasons.extend([title for title in positives if title != primary_reason])
@@ -891,11 +903,11 @@ def prediction_payload(data):
         reasons = validation_reasons + fraud_messages[:1]
         suggestions = validation_suggestions or ["Correct the affordability issues before retrying this application."]
         return {
-            "status": "Rejected",
+            "status": "Reject",
             "approval_probability": 0.0,
             "risk_score": 99.0,
             "confidence_score": 100.0,
-            "risk_category": risk_category(99.0),
+            "risk_category": "High Risk",
             "reasons": list(dict.fromkeys(reasons))[:4],
             "suggestions": list(dict.fromkeys(suggestions))[:4],
             "top_factors": [],
@@ -909,6 +921,8 @@ def prediction_payload(data):
                 "warnings": [],
                 "inconsistencies": [],
                 "manual_review": False,
+                "financial_ratios": {},
+                "field_feedback": {},
             },
             "calculated_emi": features["monthly_emi"],
             "interest_rate": features["interest_rate"],
@@ -926,24 +940,20 @@ def prediction_payload(data):
     log_prediction_inputs(ordered_payload, row)
     model_probability = float(MODEL.predict_proba(row)[0][APPROVED_CLASS_INDEX])
     probability, affordability_prob = stabilized_probability(features, model_probability)
-    rules = evaluate_underwriting_rules(validated, features, probability)
+    rules = evaluate_underwriting({
+        **validated,
+        "features": features,
+        "ml_probability": probability,
+    })
     probability = float(rules["adjusted_probability"])
     status = rules["final_status"]
-    if status == "Approved" and underwriting_decision_tier(features) != "Approved":
-        status = underwriting_decision_tier(features)
     confidence_score = model_confidence(row, model_probability)
-    raw_risk_score = round(((1 - probability) * 100) + rules["risk_penalty_points"], 1)
-    if status == "Approved":
-        risk_score = min(raw_risk_score, 39.0)
-    elif status == "Risky":
-        risk_score = min(max(raw_risk_score, 40.0), 69.0)
-    else:
-        risk_score = max(raw_risk_score, 70.0)
+    risk_score = rules["risk_score"]
     reasons, suggestions, top_factors = explain_decision(features, probability, status)
-    if status == "Approved":
+    if status == "Low Risk":
         reasons = rules["positive_reasons"] + reasons
     else:
-        reasons = rules["negative_reasons"] + rules["review_reasons"] + reasons
+        reasons = rules["negative_reasons"] + rules["review_reasons"] + rules["risk_factors"] + reasons
     suggestions = rules["suggestions"] + suggestions
     fraud_messages = fraud_flags(features)
     app.logger.info(
@@ -954,7 +964,7 @@ def prediction_payload(data):
         status,
     )
 
-    if status == "Risky":
+    if status in {"Medium Risk", "High Risk", "Manual Review"}:
         risky_reasons, risky_suggestions = risky_case_guidance(features)
         reasons = risky_reasons + reasons
         suggestions = risky_suggestions + suggestions
@@ -964,7 +974,7 @@ def prediction_payload(data):
         "approval_probability": round(probability * 100, 1),
         "risk_score": risk_score,
         "confidence_score": confidence_score,
-        "risk_category": risk_category(risk_score),
+        "risk_category": rules["risk_category"],
         "reasons": list(dict.fromkeys(reasons))[:4],
         "suggestions": list(dict.fromkeys(suggestions))[:4],
         "top_factors": top_factors,
@@ -972,11 +982,14 @@ def prediction_payload(data):
         "fraud_flag": bool(fraud_messages),
         "warning_message": (rules["warnings"] or fraud_messages or [""])[0],
         "underwriting": {
-            "penalty_points": rules["penalty_points"],
+            "penalty_points": rules["rule_points"],
+            "consistency_points": rules["consistency_points"],
             "review_reasons": rules["review_reasons"],
             "warnings": rules["warnings"],
             "inconsistencies": rules["inconsistencies"],
             "manual_review": rules["manual_review"],
+            "financial_ratios": rules["financial_ratios"],
+            "field_feedback": rules["field_feedback"],
         },
         "inputs": features,
         "calculated_emi": features["monthly_emi"],

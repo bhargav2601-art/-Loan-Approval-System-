@@ -5,14 +5,14 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': 'http://127.0.0.1:5000',
-      '/register': 'http://127.0.0.1:5000',
-      '/login': 'http://127.0.0.1:5000',
-      '/predict': 'http://127.0.0.1:5000',
-      '/chat': 'http://127.0.0.1:5000',
-      '/history': 'http://127.0.0.1:5000',
-      '/user-loans': 'http://127.0.0.1:5000',
-      '/admin-data': 'http://127.0.0.1:5000',
+      '/api': 'http://127.0.0.1:5001',
+      '/register': 'http://127.0.0.1:5001',
+      '/login': 'http://127.0.0.1:5001',
+      '/predict': 'http://127.0.0.1:5001',
+      '/chat': 'http://127.0.0.1:5001',
+      '/history': 'http://127.0.0.1:5001',
+      '/user-loans': 'http://127.0.0.1:5001',
+      '/admin-data': 'http://127.0.0.1:5001',
     },
   },
 });

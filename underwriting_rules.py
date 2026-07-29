@@ -84,11 +84,11 @@ def validate_employment_profile(data: dict[str, Any], employment_status: str) ->
         profile["work_experience"] = work_experience
         return profile
 
-    if employment_status in {"business", "self-employed"}:
+    if employment_status == "business":
         business_type = _clean_text(data.get("business_type"))
         years_in_business = _clean_float(data.get("years_in_business"))
         if not business_type:
-            raise ValueError("Please enter the business type for self-employed applicants.")
+            raise ValueError("Please enter the business type for business applicants.")
         if years_in_business < 0:
             raise ValueError("Years in business cannot be negative.")
         profile["business_type"] = business_type
@@ -196,7 +196,7 @@ def evaluate_underwriting_rules(
         if profile.get("company_name"):
             positive_reasons.append("Employer information is available for verification")
 
-    if employment_status in {"business", "self-employed"}:
+    if employment_status == "business":
         if float(profile.get("years_in_business") or 0) < 2:
             penalties.append(("Business operating history is below two years", 8))
             suggestions.append("More business seasoning and income proof can improve lender confidence.")

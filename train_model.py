@@ -57,7 +57,7 @@ ACCURACY_TARGET_MAX = 0.90
 ROC_AUC_TARGET_MIN = 0.80
 SYNTHETIC_APPROVAL_THRESHOLD = 0.24
 
-EMPLOYMENT = np.array(["salaried", "self-employed", "business", "student", "unemployed"])
+EMPLOYMENT = np.array(["salaried", "business", "student", "unemployed"])
 LOAN_TYPES = np.array(["Home Loan", "Personal Loan", "Education Loan", "Vehicle Loan"])
 
 RAW_FEATURES = [
@@ -97,16 +97,16 @@ def build_reference_dataset():
     rows = [
         {"income": 42000, "credit_score": 648, "employment_status": "salaried", "loan_amount": 250000, "existing_loans": 45000, "loan_type": "Vehicle Loan", "previous_loan": "No", "previous_loan_amount": 0, "loan_tenure": 36},
         {"income": 98000, "credit_score": 782, "employment_status": "salaried", "loan_amount": 1800000, "existing_loans": 220000, "loan_type": "Home Loan", "previous_loan": "Yes", "previous_loan_amount": 320000, "loan_tenure": 240},
-        {"income": 36000, "credit_score": 610, "employment_status": "self-employed", "loan_amount": 480000, "existing_loans": 110000, "loan_type": "Personal Loan", "previous_loan": "Yes", "previous_loan_amount": 170000, "loan_tenure": 24},
+        {"income": 36000, "credit_score": 610, "employment_status": "business", "loan_amount": 480000, "existing_loans": 110000, "loan_type": "Personal Loan", "previous_loan": "Yes", "previous_loan_amount": 170000, "loan_tenure": 24},
         {"income": 55000, "credit_score": 725, "employment_status": "business", "loan_amount": 320000, "existing_loans": 55000, "loan_type": "Education Loan", "previous_loan": "No", "previous_loan_amount": 0, "loan_tenure": 84},
         {"income": 28500, "credit_score": 690, "employment_status": "student", "loan_amount": 600000, "existing_loans": 12000, "loan_type": "Education Loan", "previous_loan": "No", "previous_loan_amount": 0, "loan_tenure": 120},
         {"income": 150000, "credit_score": 812, "employment_status": "salaried", "loan_amount": 950000, "existing_loans": 80000, "loan_type": "Vehicle Loan", "previous_loan": "Yes", "previous_loan_amount": 140000, "loan_tenure": 48},
-        {"income": 72000, "credit_score": 705, "employment_status": "self-employed", "loan_amount": 700000, "existing_loans": 280000, "loan_type": "Personal Loan", "previous_loan": "Yes", "previous_loan_amount": 210000, "loan_tenure": 60},
+        {"income": 72000, "credit_score": 705, "employment_status": "business", "loan_amount": 700000, "existing_loans": 280000, "loan_type": "Personal Loan", "previous_loan": "Yes", "previous_loan_amount": 210000, "loan_tenure": 60},
         {"income": 64000, "credit_score": 754, "employment_status": "business", "loan_amount": 450000, "existing_loans": 90000, "loan_type": "Vehicle Loan", "previous_loan": "No", "previous_loan_amount": 0, "loan_tenure": 48},
         {"income": 210000, "credit_score": 795, "employment_status": "salaried", "loan_amount": 3400000, "existing_loans": 450000, "loan_type": "Home Loan", "previous_loan": "Yes", "previous_loan_amount": 520000, "loan_tenure": 300},
         {"income": 31000, "credit_score": 575, "employment_status": "unemployed", "loan_amount": 230000, "existing_loans": 65000, "loan_type": "Personal Loan", "previous_loan": "Yes", "previous_loan_amount": 80000, "loan_tenure": 24},
         {"income": 46000, "credit_score": 688, "employment_status": "salaried", "loan_amount": 980000, "existing_loans": 150000, "loan_type": "Home Loan", "previous_loan": "No", "previous_loan_amount": 0, "loan_tenure": 180},
-        {"income": 88000, "credit_score": 736, "employment_status": "self-employed", "loan_amount": 540000, "existing_loans": 115000, "loan_type": "Education Loan", "previous_loan": "Yes", "previous_loan_amount": 95000, "loan_tenure": 96},
+        {"income": 88000, "credit_score": 736, "employment_status": "business", "loan_amount": 540000, "existing_loans": 115000, "loan_type": "Education Loan", "previous_loan": "Yes", "previous_loan_amount": 95000, "loan_tenure": 96},
     ]
     return pd.DataFrame(rows)
 

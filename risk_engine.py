@@ -13,7 +13,6 @@ LOAN_TYPE_BASE_RATES = {
 EMPLOYMENT_STABILITY = {
     "salaried": 0.92,
     "business": 0.8,
-    "self-employed": 0.74,
     "student": 0.42,
     "unemployed": 0.22,
 }

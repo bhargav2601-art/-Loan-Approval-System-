@@ -141,7 +141,7 @@ Existing Loans: ₹5,000
 ```
 Income: ₹40,000
 Credit Score: 650
-Employment: Self-employed
+Employment: Business
 Loan Amount: ₹500,000
 Tenure: 24 months
 Existing Loans: ₹20,000

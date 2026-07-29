@@ -487,7 +487,7 @@ function LoanForm({ onResult }) {
         <label>Employment status</label>
         <select value={form.employment_status} onChange={(event) => update('employment_status', event.target.value)}>
           <option value="salaried">Salaried</option>
-          <option value="self-employed">Self-employed</option>
+          <option value="business">Business</option>
           <option value="business">Business</option>
           <option value="student">Student</option>
           <option value="unemployed">Unemployed</option>
